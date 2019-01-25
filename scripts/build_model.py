@@ -2,16 +2,16 @@
 The "train -> validate -> predict -> submit" pipline script.
 """
 
+import constants
 import jsonschema
 import argparse
 import yaml
+import boto.s3.connection import S3Connection
 
 config_schema = """
 type: object
 properties:
     job_name:
-        type: string
-    instance_type:
         type: string
     features:
         type: list
@@ -21,22 +21,22 @@ properties:
         type: string
     predict:
         type: object
-        parameters:
+        properties:
             submit:
                 type: boolean
     parameter_tuning:
         type: object
-        parameters:
+        properties:
             search_type:
                 type: string
                 enum:
                     - grid
                     - stagewise
-            model_params:
+            parameters:
                 type: list
                 items:
                     type: object
-                    parameters:
+                    properties:
                         name:
                             type: string
                         values:
@@ -44,18 +44,35 @@ properties:
                             uniqueItems: true
 """
 
-def boot_instance():
-    ass
 
-def terminate_instance():
-    pass
+def load_config(bucket, config_name):
+    try:
+        bucket.download_file('dank-defense/configs/' + config_name, '/tmp/'+config_name)
+    except:
+        print("Failed to fetch config file from s3:", config_file)
+        raise
+
+    with open('/tmp/'+config_name) as config_file:
+        schema = yaml.load(schema)
+        config = json.load(config_file)
+
+        validate(schema, config)
+        return config
+
 
 def main():
     parser = argparse.ArgumentParser(description='--')
-    parser.add_argument('config_file', type=str, help='relative path to thee config file')
+    parser.add_argument('config_name', type=str, help='name of the config file in s3')
 
     args = parser.parse_args()
-    config_file_path = args.config_file
+    config_name = args.config_name
+
+    conn = S3Connection(constants.AWS_KEY, constants.AWS_SECRET)
+    bucket = conn.get_bucket(constants.BUCKET)
+
+    config = load_config(bucket)
+
+
 
 
 if __name__ == '__main__':

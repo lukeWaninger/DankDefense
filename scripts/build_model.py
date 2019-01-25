@@ -9,6 +9,8 @@ import yaml
 config_schema = """
 type: object
 properties:
+    job_name:
+        type: string
     instance_type:
         type: string
     features:
@@ -20,8 +22,6 @@ properties:
     predict:
         type: object
         parameters:
-            name:
-                type: string
             submit:
                 type: boolean
     parameter_tuning:
@@ -32,7 +32,7 @@ properties:
                 enum:
                     - grid
                     - stagewise
-            parameters:
+            model_params:
                 type: list
                 items:
                     type: object
@@ -45,7 +45,7 @@ properties:
 """
 
 def boot_instance():
-    pass
+    ass
 
 def terminate_instance():
     pass
@@ -56,7 +56,6 @@ def main():
 
     args = parser.parse_args()
     config_file_path = args.config_file
-
 
 
 if __name__ == '__main__':

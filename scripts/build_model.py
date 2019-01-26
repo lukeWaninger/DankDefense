@@ -2,11 +2,14 @@
 The "train -> validate -> predict -> submit" pipline script.
 """
 
-import constants
+import json
+
 import jsonschema
 import argparse
 import yaml
-import boto.s3.connection import S3Connection
+from boto.s3.connection import S3Connection
+
+import scripts.constants as constants
 
 config_schema = """
 type: object
@@ -49,14 +52,14 @@ def load_config(bucket, config_name):
     try:
         bucket.download_file('dank-defense/configs/' + config_name, '/tmp/'+config_name)
     except:
-        print("Failed to fetch config file from s3:", config_file)
+        print("Failed to fetch config file from s3:", config_name)
         raise
 
     with open('/tmp/'+config_name) as config_file:
-        schema = yaml.load(schema)
+        schema = yaml.load(config_schema)
         config = json.load(config_file)
 
-        validate(schema, config)
+        jsonschema.validate(schema, config)
         return config
 
 
@@ -73,7 +76,5 @@ def main():
     config = load_config(bucket)
 
 
-
-
 if __name__ == '__main__':
-    main()
+    pass

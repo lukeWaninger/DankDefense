@@ -8,27 +8,31 @@ export JOB="!job_name!"
 
 export LOGFILE=$JOB\_log.txt
 
+pip install awscli
+
 log_message()
 {
     echo "`date`: " $1 &>> $LOGFILE
 }
 
+cd /home/ubuntu
+
 log_message $"starting job"
 log_message $"downloading base data"
 mkdir data
-aws cp s3://dank-defense/data data --recursive &>> $LOGFILE
+aws s3 cp s3://dank-defense/data data --recursive
 
 log_message $"downloading pipeline scripts"
 mkdir pipe
-aws cp s3://dank-defense/pipe pipe --recursive &>>$LOGFILE
+aws s3 cp s3://dank-defense/scripts scripts --recursive
 
 log_message $"installing Python requirements"
-pip install --user -r pipe/requirements.txt &>> $LOGFILE
+pip install --user -r scripts/requirements.txt &>> $LOGFILE
 
 log_message $"running validation script"
-python pipe/validate.py --job=$JOB &>>$LOGFILE
+python scripts/validate.py --job=$JOB &>>$LOGFILE
 
-log_message $"uploading results"
-python pipe/pipe.py --upload-results
+log_message $"uploading logs"
+aws s3 cp $LOGFILE s3://dank-defense/jobs/$LOGFILE
 
-sudo
+log_message $"job complete"

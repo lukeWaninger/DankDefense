@@ -269,16 +269,16 @@ def run_job(
     else:
         raise ValueError('InstanceType must be defined in SECRETS or instance_details')
 
-    ec2 = boto3.client('ec2', region_name=region)
+    ec2_client = boto3.client('ec2', region_name=region)
 
     try:
-        security_group = ec2.create_security_group(
+        security_group = ec2_client.create_security_group(
             Description=f'{PROJECT_NAME} inbound ssh',
             GroupName=PROJECT_NAME
         )
 
         this_ip = requests.get('http://ip.42.pl/raw').text + '/32'
-        ec2.authorize_security_group_ingress(
+        ec2_client.authorize_security_group_ingress(
             GroupId=security_group['GroupId'],
             IpPermissions=[
                 dict(
@@ -293,7 +293,7 @@ def run_job(
         security_group = security_group['GroupId']
     except ClientError as e:
         if 'InvalidGroup.Duplicate' in e.response['Error']['Code']:
-            security_group = ec2.describe_security_groups(
+            security_group = ec2_client.describe_security_groups(
                 GroupNames=[PROJECT_NAME]
             )
             if len(security_group['SecurityGroups']) > 0:
@@ -345,60 +345,76 @@ def run_job(
     if ssh_key is not None:
         iargs['KeyName'] = ssh_key
 
-    ec2 = boto3.resource('ec2', region_name=region)
-    instance = ec2.create_instances(**iargs)[0]
+    ec2_resource = boto3.resource('ec2', region_name=region)
+    instance = ec2_resource.create_instances(**iargs)[0]
 
     instance.wait_until_running()
     instance.load()
 
     try:
+        time.sleep(30)
         with ec2sftp(instance.public_dns_name) as svr:
-            finished = False
+            finished, i = False, 0
             log_file, log = f'{job_name}_log.txt', []
 
             while not finished:
-                svr.get(log_file, log_file)
+                try:
+                    svr.get(log_file, log_file)
 
-                with open(log_file, 'r') as f:
-                    log_ = f.readlines()
+                    with open(log_file, 'r') as f:
+                        log_ = f.readlines()
 
-                for line in log_:
-                    if line not in log:
-                        print(line)
-                        log.append(line)
+                    for line in log_:
+                        if line not in log:
+                            print(line)
+                            log.append(line)
+                        else:
+                            pass
+
+                    if 'job complete' in log[-1]:
+                        finished = True
                     else:
-                        pass
+                        time.sleep(10)
 
-                if 'job complete' in log[-1]:
-                    finished = True
-                else:
-                    time.sleep(10)
+                except FileNotFoundError as e:
+                    i += 1
+                    if i == 10:
+                        raise e
+                    else:
+                        time.sleep(10)
 
-        ec2.terminate_instances(InstanceIds=[instance.instance_id])
-    except:
-        print('WARNING: you instance is still running')
-    print()
+        ec2_client.terminate_instances(InstanceIds=[instance.instance_id])
+    except Exception as e:
+        print('WARNING: your instance is still running')
 
 
 @contextmanager
 def ec2sftp(public_dns):
-    try:
-        server = paramiko.SSHClient()
-        server.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    server = paramiko.SSHClient()
+    server.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    connected, attempts = False, 0
 
-        server.connect(
-            hostname=public_dns,
-            username='ubuntu',
-            key_filename=SECRETS['AWS_KEY_PAIR_PATH'],
-            look_for_keys=False,
-        )
+    while not connected:
+        try:
+            server.connect(
+                hostname=public_dns,
+                username='ubuntu',
+                key_filename=SECRETS['AWS_KEY_PAIR_PATH'],
+                look_for_keys=False,
+                timeout=60
+            )
+            connected = True
 
-        server = server.open_sftp()
-        yield server
-    except Exception as e:
-        pass
-    finally:
-        server.close()
+            server = server.open_sftp()
+
+            yield server
+            server.close()
+        except TimeoutError as e:
+            attempts += 1
+            if attempts == MAX_RETRIES:
+                raise e
+        except Exception as e:
+            raise e
 
 
 def upload_results(job_name, results, kwargs={}):

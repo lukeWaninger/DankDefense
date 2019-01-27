@@ -9,6 +9,7 @@ TAG_KEY = 'Project'
 PROJECT_NAME = 'DankDefense'
 AMI = 'ami-0c6415e46854ac2d6'
 AWS_DEFAULT_REGION = 'us-east-1'
+MAX_RETRIES = 5
 
 config_schema = """
 job_name:

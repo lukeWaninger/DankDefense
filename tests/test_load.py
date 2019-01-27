@@ -173,7 +173,8 @@ class TestLoad(TestCase):
     def test_run_job(self):
         pipe.run_job('test_job_1', kwargs=self.kwargs)
 
+    @skip
     def test_ec2_connect(self):
-        with pipe.ec2connect('ec2-54-80-190-150.compute-1.amazonaws.com') as svr:
+        with pipe.ec2sftp('ec2-174-129-137-102.compute-1.amazonaws.com') as svr:
             print()
         print()

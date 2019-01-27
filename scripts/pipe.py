@@ -126,7 +126,7 @@ def download_feature(feature_name, kwargs={}):
     client = boto3.client('s3')
 
     result = {}
-    for dataset in ['train', 'test', 'validate']:
+    for dataset in constants.DATASET_KEYS:
         key = f'{configure_prefix(FEATURES_KEY, kwargs)}/{feature_name}_{dataset}.csv'
 
         obj = client.get_object(
@@ -172,11 +172,9 @@ def build_feature_set(feature_names, max_concurrent_conn=-1, kwargs={}):
 
         return frames[0].merge(recursive_join(frames[1:]), on='MachineIdentifier', how='outer')
 
-    return dict(
-        train=recursive_join([ri['train'] for ri in result]),
-        test=recursive_join([ri['test'] for ri in result]),
-        validate=recursive_join([ri['validate'] for ri in result])
-    )
+    return dict{
+        key: recursive_join([ri[key] for ri in result]) for key in constants.DATASET_KEYS
+    }
 
 
 def download_config(job_name, kwargs={}):

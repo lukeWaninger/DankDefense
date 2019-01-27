@@ -58,6 +58,17 @@ def validate_name(feature_name, kwargs={}):
 
 
 def upload_feature(feature_name, paths, overwrite=False, kwargs={}):
+    """upload a feature to S3
+
+    Args:
+        feature_name: (str) name of feature
+        paths: ((str, str, str)) file paths to training, test, and validation csv files
+        overwrite: (bool) set to True to overwrite an existing feature
+        kwargs:
+
+    Returns:
+        None
+    """
     if not validate_name(feature_name, kwargs) and not overwrite:
         raise ValueError(f'Feature name <{feature_name}> already in use')
 
@@ -80,6 +91,15 @@ def upload_feature(feature_name, paths, overwrite=False, kwargs={}):
 
 
 def set_acl(client, key):
+    """set access control policy on S3 object
+
+    Args:
+        client: (boto3.Client) the active S3 client
+        key: (str)
+
+    Returns:
+        None
+    """
     acl = client.get_bucket_acl(Bucket=BUCKET)
     del acl['ResponseMetadata']
 
@@ -91,6 +111,15 @@ def set_acl(client, key):
 
 
 def download_feature(feature_name, kwargs={}):
+    """download a single feature
+
+    Args:
+        feature_name: (str) name of feature
+        kwargs:
+
+    Returns:
+        pd.DataFrame
+    """
     if validate_name(feature_name, kwargs):
         raise ValueError(f'Feature <{feature_name}> does not exist')
 
@@ -116,6 +145,16 @@ def download_feature(feature_name, kwargs={}):
 
 
 def build_feature_set(feature_names, max_concurrent_conn=-1, kwargs={}):
+    """builds a Pandas DataFrame containing the requested features
+
+    Args:
+        feature_names: ([str,]) list of feature names
+        max_concurrent_conn: (int) Default-5xCoreCount. Sets the maximum number of features to download simultaneously
+        kwargs:
+
+    Returns:
+        pd.DataFrame
+    """
     max_conn = mul.cpu_count()*5 if max_concurrent_conn == -1 else max_concurrent_conn
 
     def download_wrapper(args):
@@ -141,6 +180,14 @@ def build_feature_set(feature_names, max_concurrent_conn=-1, kwargs={}):
 
 
 def download_config(job_name, kwargs={}):
+    """download job config from S3
+
+    Args:
+        job_name: (str) name of job
+
+    Returns:
+        dict
+    """
     if job_name not in get_jobs_listing(kwargs):
         raise ValueError(f'Job <{job_name}> has not been prepared')
 
@@ -192,7 +239,30 @@ def get_jobs_listing(kwargs={}):
     return jobs_list
 
 
+def validate_job_name(job_name, kwargs={}):
+    """
+
+    Args:
+        job_name: (str) name of job
+        kwargs:
+
+    Returns:
+        True if job_name has not been used
+    """
+    return job_name not in get_jobs_listing(kwargs)
+
+
 def prepare_job(config, overwrite=False, kwargs={}):
+    """prepare and load job to S3
+
+    Args:
+        config: (dict) matching schema defined in constants.py
+        overwrite: (bool) set to True to overwrite a job. Logs, results, and predictions will be removed from S3
+        kwargs:
+
+    Returns:
+        dict
+    """
     if not isinstance(config, dict):
         raise TypeError
 
@@ -202,9 +272,10 @@ def prepare_job(config, overwrite=False, kwargs={}):
     job_name = config['job_name']
     config = json.dumps(config)
     jsonschema.validate(config, SCHEMA)
+    prefix = configure_prefix(JOBS_KEY, kwargs)
 
     client = boto3.client('s3')
-    key = f'{configure_prefix(JOBS_KEY, kwargs)}/{job_name}_config'
+    key = f'{prefix}/{job_name}_config'
 
     with BytesIO(bytes(config, encoding='utf-8')) as f:
         response = client.put_object(
@@ -220,10 +291,31 @@ def prepare_job(config, overwrite=False, kwargs={}):
     config['submit_time'] = dt.datetime.now().isoformat()
     config['status_code'] = response['ResponseMetadata']['HTTPStatusCode']
 
+    if overwrite:
+        response = client.delete_objects(
+            Bucket=BUCKET,
+            Delete=dict(
+                Objects=[
+                    dict(key=f'{prefix}/{job_name}_predictions.csv'),
+                    dict(key=f'{prefix}/{job_name}_results.txt'),
+                    dict(key=f'{prefix}/{job_name}_log.txt')
+                ],
+                Quiet=True
+            )
+        )
+
     return config
 
 
 def prepare_init(job_name, kwargs={}):
+    """builds an initialization shell script for the EC2 instance
+
+    Args:
+        job_name: (str) name of job
+
+    Returns:
+        str
+    """
     if 'test' in kwargs.keys():
         p = os.path.join(os.path.abspath('..'), 'scripts', 'init.sh')
     else:
@@ -262,7 +354,8 @@ def run_job(
         aws_region: (str) - AWS region to build instance and security groups
         instance_type: (str) - ie. t3.nane | c4.xlarge | ...
         is_spot: (bool) - set to True to initialize as a spot request
-        ssh_key_name: (
+        ssh_key_name: (str) - name of key pair in AWS
+        ssh_key_path: (str) - path to private key on local machine
         kwargs:
 
     Returns:
@@ -455,6 +548,17 @@ def ec2sftp(public_dns, ssh_key_path=None):
 
 
 def upload_results(job_name, result_summary, predictions, kwargs={}):
+    """upload result summary and predicted values to S3
+
+    Args:
+        job_name: (str) name of job
+        result_summary: (str)
+        predictions: (pd.DataFrame)
+        kwargs:
+
+    Returns:
+        None
+    """
     if job_name not in get_jobs_listing(kwargs):
         raise ValueError(f'Job <{job_name}> has not been prepared')
 
@@ -489,6 +593,16 @@ def upload_results(job_name, result_summary, predictions, kwargs={}):
 
 
 def get_results(job_name, include_predictions=False, kwargs={}):
+    """retrieve validation results from S3
+
+    Args:
+        job_name: (str) name of job
+        include_predictions: (bool) set to True to include predicted values
+        kwargs:
+
+    Returns:
+        dict
+    """
     if job_name + '_results.txt' not in get_jobs_listing(kwargs):
         raise ValueError(f'Job <{job_name}> has not reported results')
 

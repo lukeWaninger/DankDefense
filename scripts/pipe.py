@@ -252,8 +252,22 @@ def run_job(
         aws_region=None,
         instance_type=None,
         is_spot=True,
-        ssh_key=None,
+        ssh_key_name=None,
+        ssh_key_path=None,
         kwargs={}):
+    """
+
+    Args:
+        job_name: (str) - name of job to reference in S3
+        aws_region: (str) - AWS region to build instance and security groups
+        instance_type: (str) - ie. t3.nane | c4.xlarge | ...
+        is_spot: (bool) - set to True to initialize as a spot request
+        ssh_key_name: (
+        kwargs:
+
+    Returns:
+
+    """
     if job_name not in get_jobs_listing(kwargs):
         raise ValueError(f'Job <{job_name}> not prepared')
 
@@ -337,23 +351,25 @@ def run_job(
         }
 
     # add the ssh key if it exists
-    if not 'AWS_KEY_PAIR_NAME' in SECRETS.keys():
+    if ssh_key_name is None and 'AWS_KEY_PAIR_NAME' not in SECRETS.keys():
         print('WARNING: no SSH Key found for remote monitoring')
-    else:
-        ssh_key = SECRETS['AWS_KEY_PAIR_NAME']
+    elif ssh_key_name is None:
+        ssh_key_name = SECRETS['AWS_KEY_PAIR_NAME']
 
-    if ssh_key is not None:
-        iargs['KeyName'] = ssh_key
+    if ssh_key_name is not None:
+        iargs['KeyName'] = ssh_key_name
 
+    start = time.time()
     ec2_resource = boto3.resource('ec2', region_name=region)
     instance = ec2_resource.create_instances(**iargs)[0]
+    iid = instance.instance_id
 
     instance.wait_until_running()
     instance.load()
 
     try:
         time.sleep(30)
-        with ec2sftp(instance.public_dns_name) as svr:
+        with ec2sftp(instance.public_dns_name, ssh_key_path) as svr:
             finished, i = False, 0
             log_file, log = f'{job_name}_log.txt', []
 
@@ -383,23 +399,42 @@ def run_job(
                     else:
                         time.sleep(10)
 
-        ec2_client.terminate_instances(InstanceIds=[instance.instance_id])
+        ec2_client.terminate_instances(InstanceIds=[iid])
+
+        results = get_results(job_name, include_predictions=True, kwargs=kwargs)
+        results['instance_id'] = iid
+        results['run_time'] = pd.Timedelta(seconds=(time.time()-start))
+        return results
     except Exception as e:
+        print()
+        print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         print('WARNING: your instance is still running')
+        print('---------------------------------------')
+        results = dict(
+            instance_id=iid,
+            run_time='WARNING: your instance is still running',
+            exception=e
+        )
+        return results
 
 
 @contextmanager
-def ec2sftp(public_dns):
+def ec2sftp(public_dns, ssh_key_path=None):
     server = paramiko.SSHClient()
     server.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     connected, attempts = False, 0
+
+    if ssh_key_path is None and 'AWS_KEY_PAIR_PATH' not in SECRETS.keys():
+        raise KeyError('You must provide and AWS key pair name and path to connect to the instance')
+    else:
+        ssh_key_path = SECRETS['AWS_KEY_PAIR_PATH']
 
     while not connected:
         try:
             server.connect(
                 hostname=public_dns,
                 username='ubuntu',
-                key_filename=SECRETS['AWS_KEY_PAIR_PATH'],
+                key_filename=ssh_key_path,
                 look_for_keys=False,
                 timeout=60
             )
@@ -417,14 +452,30 @@ def ec2sftp(public_dns):
             raise e
 
 
-def upload_results(job_name, results, kwargs={}):
+def upload_results(job_name, result_summary, predictions, kwargs={}):
     if job_name not in get_jobs_listing(kwargs):
         raise ValueError(f'Job <{job_name}> has not been prepared')
 
     client = boto3.client('s3')
-    key = f'{configure_prefix(JOBS_KEY, kwargs)}/{job_name}_results.txt'
 
-    with BytesIO(bytes(results, encoding='utf-8')) as f:
+    # upload the result summary
+    key = f'{configure_prefix(JOBS_KEY, kwargs)}/{job_name}_results.txt'
+    with BytesIO(bytes(result_summary, encoding='utf-8')) as f:
+        response = client.put_object(
+            ACL='private',
+            Body=f,
+            Bucket=BUCKET,
+            Key=key,
+            Tagging=TAG_KEY + "=" + PROJECT_NAME
+        )
+    set_acl(client, key)
+
+    # upload the predicted values
+    filename = f'{job_name}_predictions.csv'
+    key = f'{configure_prefix(JOBS_KEY, kwargs)}/{filename}'
+
+    predictions.to_csv(filename, index=None)
+    with open(filename, 'rb') as f:
         response = client.put_object(
             ACL='private',
             Body=f,
@@ -435,12 +486,17 @@ def upload_results(job_name, results, kwargs={}):
     set_acl(client, key)
 
 
-def get_results(job_name, kwargs={}):
+def get_results(job_name, include_predictions=False, kwargs={}):
     if job_name + '_results.txt' not in get_jobs_listing(kwargs):
         raise ValueError(f'Job <{job_name}> has not reported results')
 
+    results = {}
     client = boto3.client('s3')
 
+    # get the config
+    results['config'] = download_config(job_name, kwargs)
+
+    # get the results summary
     key = f'{configure_prefix(JOBS_KEY, kwargs)}/{job_name}_results.txt'
     obj = client.get_object(
         Bucket=BUCKET,
@@ -448,11 +504,30 @@ def get_results(job_name, kwargs={}):
     )
     if obj['ContentLength'] > 10:
         with BytesIO(obj['Body'].read()) as f:
-            results = f.read()
+            summary = f.read()
 
-        return results
+        results['summary'] = summary
     else:
-        raise Exception(f'Failed to download results for job {job_name}')
+        results['summary'] = 'Job not ran'
+
+    # get the predictions
+    if include_predictions:
+        key = f'{configure_prefix(JOBS_KEY, kwargs)}/{job_name}_predictions.csv'
+        obj = client.get_object(
+            Bucket=BUCKET,
+            Key=key
+        )
+        if obj['ContentLength'] > 10:
+            bio = BytesIO(obj['Body'].read())
+
+            results['predictions'] = pd.read_csv(bio)
+
+            bio.close()
+            del bio
+        else:
+            results['predictions'] = None
+
+    return results
 
 
 def configure_prefix(key, kwargs):

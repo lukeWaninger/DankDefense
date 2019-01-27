@@ -1,3 +1,5 @@
+import os
+import sys
 from unittest import skip, TestCase
 
 import pandas as pd
@@ -13,6 +15,28 @@ class TestLoad(TestCase):
     def setUpClass(cls):
         """perform at test class initialization
         """
+        cls.config = dict(
+            job_name='test_job_1',
+            features=['test_1', 'test_2'],
+            validation='full',
+            predict=dict(submit=False),
+            parameter_tuning=dict(
+                search_type='grid',
+                parameters=[
+                    dict(
+                        name='max_depth',
+                        values=[2]
+                    ),
+                    dict(
+                        name='learning_rate',
+                        values=[.1, .2, .3]
+                    )
+                ]
+            )
+        )
+        cls.instance_details = dict(
+            InstanceType='t3.nano'
+        )
         cls.kwargs = dict(
             test=True
         )
@@ -104,6 +128,50 @@ class TestLoad(TestCase):
         )
         self.assertTrue(isinstance(result, dict))
         self.assertTrue(all([
-            c in ['train', 'test', 'validate']
+            c in ['train', 'test', 'validate'] and
+            len(result[c].columns) == 3
             for c in result.keys()
         ]))
+
+    def test_prepare_job(self):
+        self.assertRaises(
+            ValueError,
+            pipe.prepare_job,
+            config=self.config,
+            overwrite=False,
+            kwargs=self.kwargs
+        )
+
+        result = pipe.prepare_job(
+            self.config,
+            overwrite=True,
+            kwargs=self.kwargs
+        )
+        self.assertTrue(
+            'submit_time' in result.keys() and
+            'status_code' in result.keys()
+        )
+
+    def test_get_jobs_listing(self):
+        self.assertTrue('test_job_1' in pipe.get_jobs_listing(self.kwargs))
+
+    def test_download_config(self):
+        self.assertRaises(
+            ValueError,
+            pipe.download_config,
+            job_name='not_a_job'
+        )
+
+        result = pipe.download_config('test_job_1', self.kwargs)
+        self.assertTrue(result == self.config)
+
+    def test_prep_init(self):
+        result = pipe.prepare_init('test_job_1', kwargs=self.kwargs)
+        self.assertTrue(all([
+            c not in result for c in [
+                '"!', '!#'
+            ]
+        ]))
+
+    def test_run_job(self):
+        pipe.run_job('test_job_1', self.instance_details, kwargs=self.kwargs)

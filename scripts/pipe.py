@@ -35,8 +35,10 @@ def get_feature_names(kwargs={}):
 
     contents = response.get('Contents')
     if contents is not None and len(contents) > 1:
+        prefix = configure_prefix(FEATURES_KEY, kwargs)
+
         features = list({
-            re.sub(r'(/|.csv|_test|_train|_validate|' + configure_prefix(FEATURES_KEY, kwargs) + ')+', '', c['Key'])
+            re.sub(r'(/|.csv|_' + '|_'.join(DATASET_KEYS) + '|' + prefix + ')+', '', c['Key'])
             for c in contents[1:]
     })
     else:
@@ -76,7 +78,7 @@ def upload_feature(feature_name, paths, overwrite=False, kwargs={}):
         raise FileNotFoundError('Path to feature not found')
 
     client = boto3.client('s3')
-    for path, dataset in zip(paths, constants.DATASET_KEYS):
+    for path, dataset in zip(paths, DATASET_KEYS):
         key = f'{configure_prefix(FEATURES_KEY, kwargs)}/{feature_name}_{dataset}.csv'
 
         with open(path, 'rb') as f:
@@ -126,7 +128,7 @@ def download_feature(feature_name, kwargs={}):
     client = boto3.client('s3')
 
     result = {}
-    for dataset in constants.DATASET_KEYS:
+    for dataset in DATASET_KEYS:
         key = f'{configure_prefix(FEATURES_KEY, kwargs)}/{feature_name}_{dataset}.csv'
 
         obj = client.get_object(
@@ -173,7 +175,7 @@ def build_feature_set(feature_names, max_concurrent_conn=-1, kwargs={}):
         return frames[0].merge(recursive_join(frames[1:]), on='MachineIdentifier', how='outer')
 
     return {
-        key: recursive_join([ri[key] for ri in result]) for key in constants.DATASET_KEYS
+        key: recursive_join([ri[key] for ri in result]) for key in DATASET_KEYS
     }
 
 

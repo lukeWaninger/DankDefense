@@ -382,6 +382,8 @@ def run_job(
 
                     for line in log_:
                         if line not in log:
+                            line = line.rstrip()
+
                             print(line)
                             log.append(line)
                         else:

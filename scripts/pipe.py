@@ -1,14 +1,18 @@
+from contextlib import contextmanager
 import datetime as dt
 from io import BytesIO
 import json
 import multiprocessing as mul
 from multiprocessing.dummy import Pool as TPool
 import re
+import requests
 import time
 
 import boto3
+from botocore.exceptions import ClientError
 import jsonschema
 import pandas as pd
+import paramiko
 
 from scripts.constants import *
 
@@ -70,7 +74,7 @@ def upload_feature(feature_name, paths, overwrite=False, kwargs={}):
                 Body=f,
                 Bucket=BUCKET,
                 Key=key,
-                Tagging=TAG_KEY + "=" + TAG_VALUE
+                Tagging=TAG_KEY + "=" + PROJECT_NAME
             )
             set_acl(client, key)
 
@@ -208,7 +212,7 @@ def prepare_job(config, overwrite=False, kwargs={}):
             Body=f,
             Bucket=BUCKET,
             Key=key,
-            Tagging=TAG_KEY + "=" + TAG_VALUE
+            Tagging=TAG_KEY + "=" + PROJECT_NAME
         )
     set_acl(client, key)
 
@@ -243,35 +247,66 @@ def prepare_init(job_name, kwargs={}):
     return init
 
 
-def run_job(job_name, instance_details, kwargs={}):
-    if not isinstance(instance_details, dict):
-        raise TypeError
-    if any([
-        c not in instance_details.keys()
-        for c in ['InstanceType']
-    ]):
-        raise KeyError('instance details must contain InstanceType')
-
+def run_job(
+        job_name,
+        aws_region=None,
+        instance_type=None,
+        is_spot=True,
+        ssh_key=None,
+        kwargs={}):
     if job_name not in get_jobs_listing(kwargs):
         raise ValueError(f'Job <{job_name}> not prepared')
 
-    if 'AWS_DEFAULT_REGION' in SECRETS.keys():
+    # get the aws_region
+    if aws_region is None and 'AWS_DEFAULT_REGION' in SECRETS.keys():
         region = SECRETS['AWS_DEFAULT_REGION']
-    elif 'region' in instance_details.keys():
-        region = instance_details['region']
     else:
         region = AWS_DEFAULT_REGION
 
-    ec2 = boto3.resource('ec2', region_name=region)
+    # get the instance type
+    if instance_type is None and 'AWS_DEFAULT_INSTANCE_TYPE' in SECRETS.keys():
+        instance_type = SECRETS['AWS_DEFAULT_INSTANCE_TYPE']
+    else:
+        raise ValueError('InstanceType must be defined in SECRETS or instance_details')
 
-    security_group = ec2.create_security_group(
+    ec2 = boto3.client('ec2', region_name=region)
 
-    )
+    try:
+        security_group = ec2.create_security_group(
+            Description=f'{PROJECT_NAME} inbound ssh',
+            GroupName=PROJECT_NAME
+        )
 
-    instance = ec2.create_instances(
-        Name=f'DankDefense_{job_name}',
+        this_ip = requests.get('http://ip.42.pl/raw').text + '/32'
+        ec2.authorize_security_group_ingress(
+            GroupId=security_group['GroupId'],
+            IpPermissions=[
+                dict(
+                    IpProtocol='tcp',
+                    FromPort=22,
+                    ToPort=22,
+                    IpRanges=[dict(CidrIp=this_ip)]
+                )
+            ]
+        )
+
+        security_group = security_group['GroupId']
+    except ClientError as e:
+        if 'InvalidGroup.Duplicate' in e.response['Error']['Code']:
+            security_group = ec2.describe_security_groups(
+                GroupNames=[PROJECT_NAME]
+            )
+            if len(security_group['SecurityGroups']) > 0:
+                security_group = security_group['SecurityGroups'][0]['GroupId']
+            else:
+                raise e
+        else:
+            raise e
+
+    iargs = dict(
         ImageId=AMI,
-        InstanceType=instance_details['InstanceType'],
+        InstanceType=instance_type,
+        SecurityGroupIds=[security_group],
         UserData=prepare_init(job_name, kwargs=kwargs),
         DisableApiTermination=False,
         EbsOptimized=True,
@@ -281,30 +316,127 @@ def run_job(job_name, instance_details, kwargs={}):
                 'Tags': [
                     {
                         'Key': TAG_KEY,
-                        'Value': TAG_VALUE
+                        'Value': PROJECT_NAME
                     },
                 ]
             },
         ],
-        InstanceMarketOptions={
-            'MarketType': 'spot',
-            'SpotOptions': {
-                'SpotInstanceType': 'one-time',
-                'InstanceInterruptionBehavior': 'terminate'
-            }
-        },
         MaxCount=1,
         MinCount=1,
         Monitoring=dict(Enabled=False)
     )
 
-    while get_results(job_name, kwargs=kwargs) is None:
-        time.sleep(10)
+    # verify spot request
+    if is_spot:
+        iargs['InstanceMarketOptions'] = {
+            'MarketType': 'spot',
+            'SpotOptions': {
+                'SpotInstanceType': 'one-time',
+                'InstanceInterruptionBehavior': 'terminate'
+            }
+        }
+
+    # add the ssh key if it exists
+    if not 'AWS_KEY_PAIR_NAME' in SECRETS.keys():
+        print('WARNING: no SSH Key found for remote monitoring')
+    else:
+        ssh_key = SECRETS['AWS_KEY_PAIR_NAME']
+
+    if ssh_key is not None:
+        iargs['KeyName'] = ssh_key
+
+    ec2 = boto3.resource('ec2', region_name=region)
+    instance = ec2.create_instances(**iargs)[0]
+
+    instance.wait_until_running()
+    instance.load()
+
+    try:
+        with ec2sftp(instance.public_dns_name) as svr:
+            finished = False
+            log_file, log = f'{job_name}_log.txt', []
+
+            while not finished:
+                svr.get(log_file, log_file)
+
+                with open(log_file, 'r') as f:
+                    log_ = f.readlines()
+
+                for line in log_:
+                    if line not in log:
+                        print(line)
+                        log.append(line)
+                    else:
+                        pass
+
+                if 'job complete' in log[-1]:
+                    finished = True
+                else:
+                    time.sleep(10)
+
+        ec2.terminate_instances(InstanceIds=[instance.instance_id])
+    except:
+        print('WARNING: you instance is still running')
     print()
 
 
+@contextmanager
+def ec2sftp(public_dns):
+    try:
+        server = paramiko.SSHClient()
+        server.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        server.connect(
+            hostname=public_dns,
+            username='ubuntu',
+            key_filename=SECRETS['AWS_KEY_PAIR_PATH'],
+            look_for_keys=False,
+        )
+
+        server = server.open_sftp()
+        yield server
+    except Exception as e:
+        pass
+    finally:
+        server.close()
+
+
+def upload_results(job_name, results, kwargs={}):
+    if job_name not in get_jobs_listing(kwargs):
+        raise ValueError(f'Job <{job_name}> has not been prepared')
+
+    client = boto3.client('s3')
+    key = f'{configure_prefix(JOBS_KEY, kwargs)}/{job_name}_results.txt'
+
+    with BytesIO(bytes(results, encoding='utf-8')) as f:
+        response = client.put_object(
+            ACL='private',
+            Body=f,
+            Bucket=BUCKET,
+            Key=key,
+            Tagging=TAG_KEY + "=" + PROJECT_NAME
+        )
+    set_acl(client, key)
+
+
 def get_results(job_name, kwargs={}):
-    pass
+    if job_name + '_results.txt' not in get_jobs_listing(kwargs):
+        raise ValueError(f'Job <{job_name}> has not reported results')
+
+    client = boto3.client('s3')
+
+    key = f'{configure_prefix(JOBS_KEY, kwargs)}/{job_name}_results.txt'
+    obj = client.get_object(
+        Bucket=BUCKET,
+        Key=key
+    )
+    if obj['ContentLength'] > 10:
+        with BytesIO(obj['Body'].read()) as f:
+            results = f.read()
+
+        return results
+    else:
+        raise Exception(f'Failed to download results for job {job_name}')
 
 
 def configure_prefix(key, kwargs):

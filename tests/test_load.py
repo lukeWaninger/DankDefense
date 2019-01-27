@@ -170,6 +170,7 @@ class TestLoad(TestCase):
             ]
         ]))
 
+    @skip
     def test_run_job(self):
         pipe.run_job('test_job_1', kwargs=self.kwargs)
 
@@ -177,4 +178,27 @@ class TestLoad(TestCase):
     def test_ec2_connect(self):
         with pipe.ec2sftp('ec2-174-129-137-102.compute-1.amazonaws.com') as svr:
             print()
-        print()
+
+    def test_upload_results(self):
+        result_summary = "this is a test\nof stuff"
+        predictions = pd.DataFrame([
+            [1, 1],
+            [2, 0],
+            [3, 0],
+            [4, 1]
+        ], columns=['idx', 'pre'])
+
+        pipe.upload_results(
+            'test_job_1',
+            result_summary,
+            predictions,
+            kwargs=self.kwargs
+        )
+
+    def test_get_results(self):
+        results = pipe.get_results(
+            'test_job_1', True, kwargs=self.kwargs
+        )
+        self.assertTrue('config' in results.keys())
+        self.assertTrue('summary' in results.keys())
+        self.assertTrue('predictions' in results.keys())

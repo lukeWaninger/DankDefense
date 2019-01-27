@@ -172,7 +172,7 @@ def build_feature_set(feature_names, max_concurrent_conn=-1, kwargs={}):
 
         return frames[0].merge(recursive_join(frames[1:]), on='MachineIdentifier', how='outer')
 
-    return dict{
+    return {
         key: recursive_join([ri[key] for ri in result]) for key in constants.DATASET_KEYS
     }
 

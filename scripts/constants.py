@@ -6,7 +6,7 @@ BUCKET = 'dank-defense'
 FEATURES_KEY = 'features'
 JOBS_KEY = 'jobs'
 TAG_KEY = 'Project'
-TAG_VALUE = 'DankDefense'
+PROJECT_NAME = 'DankDefense'
 AMI = 'ami-0c6415e46854ac2d6'
 AWS_DEFAULT_REGION = 'us-east-1'
 
@@ -50,5 +50,7 @@ with open(os.path.join(Path.home(), 'DD_SECRETS'), 'r') as f:
     cf = f.readlines()
 
     SECRETS = {
-        k: v for k, v in [list(map(lambda x: x.strip(), l.split('='))) for l in cf]
-    }
+        k: v for k, v in [
+            list(map(lambda x: x.strip(), l.split('=')))
+            for l in cf if not l.startswith('#')
+    ]}

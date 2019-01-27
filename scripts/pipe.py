@@ -76,7 +76,7 @@ def upload_feature(feature_name, paths, overwrite=False, kwargs={}):
         raise FileNotFoundError('Path to feature not found')
 
     client = boto3.client('s3')
-    for path, dataset in zip(paths, ['train', 'test', 'validate']):
+    for path, dataset in zip(paths, constants.DATASET_KEYS):
         key = f'{configure_prefix(FEATURES_KEY, kwargs)}/{feature_name}_{dataset}.csv'
 
         with open(path, 'rb') as f:

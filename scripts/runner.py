@@ -4,11 +4,16 @@ The "train -> validate -> predict -> submit" pipline script.
 
 import argparse
 import pandas as pd
-import scripts.pipe as pipe
 import importlib
 import itertools
 import copy
 from sklearn.metrics import roc_auc_score, accuracy_score, confusion_matrix, classification_report
+
+import os
+if 'pipe.py' in os.listdir('.'):
+    import pipe
+else:
+    from scripts import pipe
 
 
 def fetch_data(job_name, **kwargs):
@@ -50,6 +55,7 @@ def predict(config, parameters):
     model.train(**train_full)
     yhat = model.predict(test['x'])
     return yhat
+
 
 def run_task(config):
     """runs the task specified in the config

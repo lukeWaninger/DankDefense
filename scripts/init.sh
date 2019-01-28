@@ -23,13 +23,13 @@ mkdir data
 aws s3 cp s3://dank-defense/data data --recursive
 
 log_message $"downloading pipeline scripts"
-aws s3 cp s3://dank-defense/scripts scripts --recursive
+aws s3 cp s3://dank-defense/scripts . --recursive
 
 log_message $"installing Python requirements"
-pip install --user -r scripts/requirements.txt &>> $LOGFILE
+pip install --user -r requirements.txt &>> $LOGFILE
 
 log_message $"modelling"
-python scripts/runner.py --job=$JOB &>> $LOGFILE
+python runner.py --job=$JOB &>> $LOGFILE
 
 log_message $"uploading logs"
 aws s3 cp $LOGFILE s3://dank-defense/jobs/$LOGFILE

@@ -1,4 +1,3 @@
-import base64
 from contextlib import contextmanager
 import datetime as dt
 from io import BytesIO

@@ -29,8 +29,8 @@ aws s3 cp s3://dank-defense/scripts scripts --recursive
 log_message $"installing Python requirements"
 pip install --user -r scripts/requirements.txt &>> $LOGFILE
 
-log_message $"running validation script"
-python scripts/validate.py --job=$JOB &>> $LOGFILE
+log_message $"modelling"
+python scripts/build_model.py --job=$JOB &>> $LOGFILE
 
 log_message $"uploading logs"
 aws s3 cp $LOGFILE s3://dank-defense/jobs/$LOGFILE

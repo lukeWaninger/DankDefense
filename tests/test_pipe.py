@@ -1,5 +1,3 @@
-import os
-import sys
 from unittest import skip, TestCase
 
 import pandas as pd
@@ -7,7 +5,7 @@ import pandas as pd
 import scripts.pipe as pipe
 
 
-class TestLoad(TestCase):
+class TestPipe(TestCase):
     """test class for loading features into S3
     """
 
@@ -17,10 +15,15 @@ class TestLoad(TestCase):
         """
         cls.config = dict(
             job_name='test_job_1',
-            features=['test_1', 'test_2'],
-            validation='full',
-            predict=dict(submit=False),
-            parameter_tuning=dict(
+            features=['feature_3', 'feature_4'],
+            model=dict(
+                name='lightgbm',
+                parameters=dict(
+                    verbosity=1
+                )
+            ),
+            task='tune',
+            tuning=dict(
                 search_type='grid',
                 parameters=[
                     dict(
@@ -31,7 +34,8 @@ class TestLoad(TestCase):
                         name='learning_rate',
                         values=[.1, .2, .3]
                     )
-                ]
+                ],
+                metric='auc'
             )
         )
         cls.kwargs = dict(
@@ -54,14 +58,14 @@ class TestLoad(TestCase):
         pass
 
     def test_get_feature_names(self):
-        features = pipe.get_feature_names(kwargs=self.kwargs)
+        features = pipe.get_feature_names(**self.kwargs)
         self.assertTrue(all([
             c in ['test_1', 'test_2'] for c in features
         ]))
 
     def test_validate_name(self):
-        self.assertFalse(pipe.validate_name('test_1', kwargs=self.kwargs))
-        self.assertTrue(pipe.validate_name('test-1', kwargs=self.kwargs))
+        self.assertFalse(pipe.validate_name('test_1', **self.kwargs))
+        self.assertTrue(pipe.validate_name('test-1', **self.kwargs))
 
     def test_upload_feature(self):
         self.assertRaises(
@@ -69,14 +73,14 @@ class TestLoad(TestCase):
             pipe.upload_feature,
             feature_name='test_1',
             datasets=('.', '.', '.'),
-            kwargs=self.kwargs
+            **self.kwargs
         )
         self.assertRaises(
             FileNotFoundError,
             pipe.upload_feature,
             feature_name='test_3',
             paths=('test_3.csv', 'test_3.csv', 'test_3.csv'),
-            kwargs=self.kwargs
+            **self.kwargs
         )
         paths = (
             'feature_3_train.csv',
@@ -87,14 +91,14 @@ class TestLoad(TestCase):
             feature_name='feature_3',
             datasets=paths,
             overwrite=True,
-            kwargs=self.kwargs
+            **self.kwargs
         ) is not None)
         self.assertRaises(
             ValueError,
             pipe.upload_feature,
             feature_name='feature_3',
             datasets=paths,
-            kwargs=self.kwargs
+            **self.kwargs
         )
 
     def test_upload_feature_from_df(self):
@@ -107,9 +111,8 @@ class TestLoad(TestCase):
             feature_name='feature_3',
             datasets=dfs,
             overwrite=True,
-            kwargs=self.kwargs
+            **self.kwargs
         ) is not None)
-
 
     def test_download_feature(self):
         self.assertRaises(
@@ -119,7 +122,7 @@ class TestLoad(TestCase):
         )
         result = pipe.download_feature(
             'feature_3',
-            kwargs=self.kwargs
+            **self.kwargs
         )
         self.assertTrue(isinstance(result, dict))
         self.assertTrue(all([
@@ -135,12 +138,11 @@ class TestLoad(TestCase):
         result = pipe.build_feature_set(
             ['feature_3', 'feature_4'],
             max_concurrent_conn=1,
-            kwargs=self.kwargs
+            **self.kwargs
         )
         self.assertTrue(isinstance(result, dict))
         self.assertTrue(all([
-            c in ['train', 'test', 'validate'] and
-            len(result[c].columns) == 3
+            c in ['train', 'test', 'validate']
             for c in result.keys()
         ]))
 
@@ -150,13 +152,13 @@ class TestLoad(TestCase):
             pipe.prepare_job,
             config=self.config,
             overwrite=False,
-            kwargs=self.kwargs
+            **self.kwargs
         )
 
         result = pipe.prepare_job(
             self.config,
             overwrite=True,
-            kwargs=self.kwargs
+            **self.kwargs
         )
         self.assertTrue(
             'submit_time' in result.keys() and
@@ -164,7 +166,7 @@ class TestLoad(TestCase):
         )
 
     def test_get_jobs_listing(self):
-        self.assertTrue('test_job_1' in pipe.get_jobs_listing(self.kwargs))
+        self.assertTrue('test_job_1' in pipe.get_jobs_listing(**self.kwargs))
 
     def test_download_config(self):
         self.assertRaises(
@@ -173,11 +175,11 @@ class TestLoad(TestCase):
             job_name='not_a_job'
         )
 
-        result = pipe.download_config('test_job_1', self.kwargs)
+        result = pipe.download_config('test_job_1', **self.kwargs)
         self.assertTrue(result == self.config)
 
     def test_prep_init(self):
-        result = pipe.prepare_init('test_job_1', kwargs=self.kwargs)
+        result = pipe.prepare_init('test_job_1', **self.kwargs)
         self.assertTrue(all([
             c not in result for c in [
                 '"!', '!#'
@@ -186,7 +188,7 @@ class TestLoad(TestCase):
 
     @skip
     def test_run_job(self):
-        pipe.run_job('test_job_1', kwargs=self.kwargs)
+        pipe.run_job('test_job_1', **self.kwargs)
 
     @skip
     def test_ec2_connect(self):
@@ -206,12 +208,12 @@ class TestLoad(TestCase):
             'test_job_1',
             result_summary,
             predictions,
-            kwargs=self.kwargs
+            **self.kwargs
         )
 
     def test_get_results(self):
         results = pipe.get_results(
-            'test_job_1', True, kwargs=self.kwargs
+            'test_job_1', True, **self.kwargs
         )
         self.assertTrue('config' in results.keys())
         self.assertTrue('summary' in results.keys())

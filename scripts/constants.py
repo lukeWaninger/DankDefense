@@ -13,64 +13,72 @@ MAX_RETRIES = 5
 DATASET_KEYS = ['train', 'test', 'validate']
 
 config_schema = """
-type: object
-required:
-    - job_name
-    - features
-    - model
-    - task
-    - tuning
-properties:
-    job_name:
-        type: string
-    features:
-        type: array
-        items:
+config:
+    type: object
+    required:
+        - job_name
+        - features
+        - model
+        - task
+        - tuning
+    properties:
+        job_name:
             type: string
-            uniqueItems: true
-    model:
-        type: object
-        required:
-            - name
-            - parameters
-        properties:
-            name:
+        features:
+            type: array
+            items:
                 type: string
-                enum: 
-                    - lightgbm
-            parameters:
-                type: object
-    task:
-        type: string
-        enum: 
-            - validate
-            - tune
-            - submit
-            _ validate_submit
-            _ tune_submit
-    tuning:
-        type: object
-        required:
-            - search_type
-            - parameters
-        properties:
-            search_type:
-                type: string
-                enum:
-                    - grid
-                    - stage_wise
-            parameters:
-                type: array
-                items:
+                uniqueItems: true
+        model:
+            type: object
+            required:
+                - name
+                - parameters
+            properties:
+                name:
+                    type: string
+                    enum: 
+                        - lightgbm
+                parameters:
                     type: object
-                    properties:
-                        name:
-                            type: string
-                        values:
-                            type: array
-                            uniqueItems: true
+        task:
+            type: string
+            enum: 
+                - validate
+                - tune
+                - predict
+                - validate_predict
+                - tune_predict
+        tuning:
+            type: object
+            required:
+                - search_type
+                - parameters
+                - metric
+            properties:
+                search_type:
+                    type: string
+                    enum:
+                        - grid
+                        - stage_wise
+                parameters:
+                    type: array
+                    items:
+                        type: object
+                        properties:
+                            name:
+                                type: string
+                            values:
+                                type: array
+                                uniqueItems: true
+                metric:
+                    type: string
+                    default: auc
+                    enum:
+                        - auc
 """
 SCHEMA = yaml.load(config_schema)
+"""https://lightgbm.readthedocs.io/en/latest/Parameters.html"""
 
 with open(os.path.join(Path.home(), 'DD_SECRETS'), 'r') as f:
     cf = f.readlines()
@@ -81,5 +89,6 @@ with open(os.path.join(Path.home(), 'DD_SECRETS'), 'r') as f:
             for l in cf if not l.startswith('#')
     ]}
 
-for secret in SECRETS:
-    os.environ[secret] = SECRETS[secret]
+    for secret in SECRETS:
+        os.environ[secret] = SECRETS[secret]
+

@@ -10,10 +10,14 @@ import itertools
 import copy
 from sklearn.metrics import roc_auc_score, accuracy_score, confusion_matrix, classification_report
 
-def fetch_data(job_name):
-    config = pipe.download_config(job_name),
-    config.update(pipe.build_feature_set(config.features))
-    config['train_all'] = pd.concate(config['train'], config['validation'], axis=0)
+
+def fetch_data(job_name, **kwargs):
+    config = pipe.download_config(job_name, **kwargs)
+    config.update(pipe.build_feature_set(config['features'], **kwargs))
+    config['train_all'] = {
+        'x': pd.concat([config['train']['x'], config['validate']['x']], axis=0, sort=False),
+        'y': pd.concat([config['train']['y'], config['validate']['y']], axis=0, sort=False)
+    }
 
     return config
 
@@ -34,6 +38,7 @@ def validate(config, parameters):
     model = load_model(config)(parameters)
     model.train(**train)
     yhat = model.predict(val['x'])
+
     return metrics(val['y'], yhat)
 
 
@@ -62,18 +67,25 @@ def run_task(config):
     if task == 'validate':
         results = validate(config, config['model']['parameters'])
         pipe.upload_results(job, str(results), None)
+
     elif task == 'predict':
         predictions = predict(config, config['model']['parameters'])
         pipe.upload_results(job, None, predictions)
+
     elif task == 'validate_predict':
         results = validate(config, config['model']['parameters'])
         predictions = predict(config, config['model']['parameters'])
         pipe.upload_results(job, str(results), predictions)
+
     elif task == 'tune' or task == 'tune_predict':
         if config['tuning']['search_type'] == 'grid':
             best_params, results = tune_grid(config)
+
         elif config['tuning']['search_type'] == 'stage_wise':
             best_params, results = tune_stage_wise(config)
+
+        else:
+            raise KeyError('Search type not defined')
 
         predictions = predict(config, best_params) if task == 'tune' else None
         pipe.upload_results(job, str(results) + str(best_params), predictions)
@@ -145,12 +157,15 @@ def tune_grid(config):
     results = []
     for c in candidate_updates:
         candidate_parameters = copy.deepcopy(parameters)
+
         for path, value in c.items():
             _update_dict(candidate_parameters, path, value)
+
         res = validate(config, candidate_parameters)
         results.append((parameters, res))
 
-    best_parameters = max(results, key=lambda x: x[1]['auc'])
+    metric = config['tuning']['metric']
+    best_parameters = max(results, key=lambda x: x[1][metric])
     return best_parameters, results
 
 
@@ -204,4 +219,4 @@ def main():
 
 
 if __name__ == '__main__':
-    pass
+    main()

@@ -51,7 +51,6 @@ def predict(config, parameters):
     yhat = model.predict(test['x'])
     return yhat
 
-
 def run_task(config):
     """runs the task specified in the config
     Check config schema for a list of valid tasks

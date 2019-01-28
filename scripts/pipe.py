@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 import datetime as dt
-from io import BytesIO
+from io import BytesIO, StringIO
 import json
 import multiprocessing as mul
 from multiprocessing.dummy import Pool as TPool
@@ -13,6 +13,7 @@ from botocore.exceptions import ClientError
 import jsonschema
 import pandas as pd
 import paramiko
+from tqdm import tqdm
 
 from scripts.constants import *
 
@@ -59,27 +60,33 @@ def validate_name(feature_name, kwargs={}):
     return feature_name not in get_feature_names(kwargs)
 
 
-def upload_feature(feature_name, paths, overwrite=False, kwargs={}):
+def upload_feature(feature_name, datasets, overwrite=False, kwargs={}):
     """upload a feature to S3
 
     Args:
         feature_name: (str) name of feature
-        paths: ((str, str, str)) file paths to training, test, and validation csv files
+        datasets: ((str, str, str) | (pd.DataFrame, pd.DataFrame, pd.DataFrame)) file paths or DataFrames to training, test, and validation csv files
         overwrite: (bool) set to True to overwrite an existing feature
         kwargs:
 
     Returns:
-        None
+        dict containing ETags of uploaded items by dataset
     """
     if not validate_name(feature_name, kwargs) and not overwrite:
         raise ValueError(f'Feature name <{feature_name}> already in use')
 
-    if any([not os.path.exists(p) for p in paths]):
+    if any([not os.path.exists(p) for p in datasets if isinstance(p, str)]):
         raise FileNotFoundError('Path to feature not found')
 
     client = boto3.client('s3')
-    for path, dataset in zip(paths, DATASET_KEYS):
-        key = f'{configure_prefix(FEATURES_KEY, kwargs)}/{feature_name}_{dataset}.csv'
+    etags = {}
+
+    for feat, dataset in zip(datasets, DATASET_KEYS):
+        path = f'{feature_name}_{dataset}.csv'
+        key = f'{configure_prefix(FEATURES_KEY, kwargs)}/{path}'
+
+        if isinstance(feat, pd.DataFrame):
+            feat.to_csv(path, index=None)
 
         with open(path, 'rb') as f:
             response = client.put_object(
@@ -89,7 +96,10 @@ def upload_feature(feature_name, paths, overwrite=False, kwargs={}):
                 Key=key,
                 Tagging=TAG_KEY + "=" + PROJECT_NAME
             )
-            set_acl(client, key)
+        set_acl(client, key)
+
+        etags[dataset] = response['ETag'].replace('"', '')
+    return etags
 
 
 def set_acl(client, key):
@@ -174,8 +184,14 @@ def build_feature_set(feature_names, max_concurrent_conn=-1, kwargs={}):
 
         return frames[0].merge(recursive_join(frames[1:]), on='MachineIdentifier', how='outer')
 
+    target = download_feature('Target')
+
     return {
-        key: recursive_join([ri[key] for ri in result]) for key in DATASET_KEYS
+        key: {
+            'x': recursive_join([ri[key] for ri in result]),
+            'y': target[key] if key != 'test' else None
+        }
+        for key in DATASET_KEYS
     }
 
 
@@ -325,9 +341,9 @@ def prepare_init(job_name, kwargs={}):
         init = f.read()
 
     init = init.replace(
-        "!aws_access_key_id!", SECRETS['AWS_KEY']
+        "!aws_access_key_id!", SECRETS['AWS_ACCESS_KEY_ID']
     ).replace(
-        "!aws_secret_access_key!", SECRETS['AWS_SECRET']
+        "!aws_secret_access_key!", SECRETS['AWS_SECRET_ACCESS_KEY']
     ).replace(
         "!kaggle_username!", SECRETS['KAGGLE_USERNAME']
     ).replace(

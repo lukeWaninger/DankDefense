@@ -1,5 +1,5 @@
 """
-The "train -> validate -> predict -> submit" pipline script.
+The "train -> validate -> predict" pipeline.
 """
 
 import argparse
@@ -50,6 +50,7 @@ def predict(config, parameters):
     model.train(**train_full)
     yhat = model.predict(test['x'])
     return yhat
+
 
 def run_task(config):
     """runs the task specified in the config
@@ -122,9 +123,10 @@ def tune_stage_wise(config):
         (best_params, [(params, metrics)])
     """
     parameters = copy.deepcopy(config['model']['parameters'])
-    updates = copy.deepcopy(config['tuning']['parameters'])
+    updates = config['tuning']['parameters']
+    metric = config['tuning']['metric']
 
-    # initialize all the params to the first ones
+    # initialize all params to the first value in their list
     for path, values in updates.items():
         _update_dict(parameters, path, values[0])
 
@@ -137,7 +139,7 @@ def tune_stage_wise(config):
             res = validate(config, candidate_parameters)
             results.append((candidate_parameters, res))
 
-        parameters = max(results, key=lambda x: x[1]['auc'])[0]
+        parameters = max(results, key=lambda x: x[1][metric])[0]
 
     return parameters, results
 
@@ -165,20 +167,24 @@ def tune_grid(config):
         results.append((parameters, res))
 
     metric = config['tuning']['metric']
-    best_parameters = max(results, key=lambda x: x[1][metric])
+    best_parameters = max(results, key=lambda x: x[1][metric])[0]
+
     return best_parameters, results
 
 
 def title(*args):
     """returns a title/header formatted string
+    TODO: move to utils?
 
     >>> title('Hello')
     out: -----
          Hello
          -----
 
-    :param args: text
-    :return: None
+    Args:
+      *args: [any]
+    Returns:
+        None
     """
     out = ' '.join(map(str, args))
     line = ('-'*len(out))

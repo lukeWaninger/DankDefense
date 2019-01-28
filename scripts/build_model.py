@@ -20,7 +20,7 @@ def fetch_data(job_name):
 
 def metrics(y, yhat):
     return dict(
-        auc=roc_auc_score(y, yat),
+        auc=roc_auc_score(y, yhat),
         accuracy=accuracy_score(y, yhat),
         confusion_matrix=confusion_matrix(y, yhat),
         classification_report=classification_report(y, yhat)
@@ -46,7 +46,6 @@ def predict(config, parameters):
     yhat = model.predict(test['x'])
     return yhat
 
-
 def run_task(config):
     """runs the task specified in the config
     Check config schema for a list of valid tasks
@@ -70,8 +69,7 @@ def run_task(config):
         results = validate(config, config['model']['parameters'])
         predictions = predict(config, config['model']['parameters'])
         pipe.upload_results(job, str(results), predictions)
-    elif task =='tune' or task == 'tune_predict':
-    elif task =='tune_predict':
+    elif task == 'tune' or task == 'tune_predict':
         if config['tuning']['search_type'] == 'grid':
             best_params, results = tune_grid(config)
         elif config['tuning']['search_type'] == 'stage_wise':
@@ -101,6 +99,7 @@ def _update_dict(obj, path, value):
     for i in range(0, len(keys) - 1):
         obj = obj[keys[i]]
     obj[keys[len(keys) - 1]] = value
+
 
 def tune_stage_wise(config):
     """"runs a stage-wise search on the validation set
@@ -153,6 +152,7 @@ def tune_grid(config):
 
     best_parameters = max(results, key=lambda x: x[1]['auc'])
     return best_parameters, results
+
 
 def title(*args):
     """returns a title/header formatted string

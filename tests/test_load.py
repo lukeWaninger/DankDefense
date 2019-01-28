@@ -68,7 +68,7 @@ class TestLoad(TestCase):
             ValueError,
             pipe.upload_feature,
             feature_name='test_1',
-            paths=('.', '.', '.'),
+            datasets=('.', '.', '.'),
             kwargs=self.kwargs
         )
         self.assertRaises(
@@ -85,17 +85,31 @@ class TestLoad(TestCase):
         )
         self.assertTrue(pipe.upload_feature(
             feature_name='feature_3',
-            paths=paths,
+            datasets=paths,
             overwrite=True,
             kwargs=self.kwargs
-        ) is None)
+        ) is not None)
         self.assertRaises(
             ValueError,
             pipe.upload_feature,
             feature_name='feature_3',
-            paths=paths,
+            datasets=paths,
             kwargs=self.kwargs
         )
+
+    def test_upload_feature_from_df(self):
+        dfs = [
+            pd.read_csv('feature_3_test.csv'),
+            pd.read_csv('feature_3_train.csv'),
+            pd.read_csv('feature_3_validate.csv')
+        ]
+        self.assertTrue(pipe.upload_feature(
+            feature_name='feature_3',
+            datasets=dfs,
+            overwrite=True,
+            kwargs=self.kwargs
+        ) is not None)
+
 
     def test_download_feature(self):
         self.assertRaises(

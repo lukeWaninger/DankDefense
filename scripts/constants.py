@@ -10,7 +10,7 @@ PROJECT_NAME = 'DankDefense'
 AMI = 'ami-0c6415e46854ac2d6'
 AWS_DEFAULT_REGION = 'us-east-1'
 MAX_RETRIES = 5
-DATASET_KEYS = ['train', 'test', 'validate', 'validate_as_train']
+DATASET_KEYS = ['train', 'test', 'validate']
 
 config_schema = """
 job_name:
@@ -56,3 +56,6 @@ with open(os.path.join(Path.home(), 'DD_SECRETS'), 'r') as f:
             list(map(lambda x: x.strip(), l.split('=')))
             for l in cf if not l.startswith('#')
     ]}
+
+for secret in SECRETS:
+    os.environ[secret] = SECRETS[secret]

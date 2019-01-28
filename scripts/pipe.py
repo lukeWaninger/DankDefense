@@ -501,9 +501,9 @@ class Ec2Job(object):
                         log_ = f.readlines()
 
                     for line in log_:
-                        if line not in log:
-                            line = line.rstrip()
+                        line = line.rstrip()
 
+                        if line not in log:
                             print(line)
                             log.append(line)
                         else:

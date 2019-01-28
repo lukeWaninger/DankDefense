@@ -8,43 +8,67 @@ JOBS_KEY = 'jobs'
 TAG_KEY = 'Project'
 PROJECT_NAME = 'DankDefense'
 AMI = 'ami-0c6415e46854ac2d6'
-AWS_DEFAULT_REGION = 'us-east-1'
+AWS_DEFAULT_REGION = 'umport s-east-1'
 MAX_RETRIES = 5
 DATASET_KEYS = ['train', 'test', 'validate', 'validate_as_train']
 
 config_schema = """
-job_name:
-    type: string
-features:
-    type: array
-    items:
+type: object
+required:
+    - job_name
+    - features
+    - model
+    - task
+    - tuning
+properties:
+    job_name:
         type: string
-        uniqueItems: true
-validation:
-    type: string
-predict:
-    type: object
-    properties:
-        submit:
-            type: boolean
-parameter_tuning:
-    type: object
-    properties:
-        search_type:
+    features:
+        type: array
+        items:
             type: string
-            enum:
-                - grid
-                - stagewise
-        parameters:
-            type: array
-            items:
+            uniqueItems: true
+    model:
+        type: object
+        required:
+            - name
+            - parameters
+        properties:
+            name:
+                type: string
+                enum: 
+                    - lightgbm
+            parameters:
                 type: object
-                properties:
-                    name:
-                        type: string
-                    values:
-                        type: array
-                        uniqueItems: true
+    task:
+        type: string
+        enum: 
+            - validate
+            - tune
+            - submit
+            _ validate_submit
+            _ tune_submit
+    tuning:
+        type: object
+        required:
+            - search_type
+            - parameters
+        properties:
+            search_type:
+                type: string
+                enum:
+                    - grid
+                    - stage_wise
+            parameters:
+                type: array
+                items:
+                    type: object
+                    properties:
+                        name:
+                            type: string
+                        values:
+                            type: array
+                            uniqueItems: true
 """
 SCHEMA = yaml.load(config_schema)
 

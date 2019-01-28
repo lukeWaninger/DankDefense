@@ -565,31 +565,33 @@ def upload_results(job_name, result_summary, predictions, kwargs={}):
     client = boto3.client('s3')
 
     # upload the result summary
-    key = f'{configure_prefix(JOBS_KEY, kwargs)}/{job_name}_results.txt'
-    with BytesIO(bytes(result_summary, encoding='utf-8')) as f:
-        response = client.put_object(
-            ACL='private',
-            Body=f,
-            Bucket=BUCKET,
-            Key=key,
-            Tagging=TAG_KEY + "=" + PROJECT_NAME
-        )
-    set_acl(client, key)
+    if result_summary is not None:
+        key = f'{configure_prefix(JOBS_KEY, kwargs)}/{job_name}_results.txt'
+        with BytesIO(bytes(result_summary, encoding='utf-8')) as f:
+            response = client.put_object(
+                ACL='private',
+                Body=f,
+                Bucket=BUCKET,
+                Key=key,
+                Tagging=TAG_KEY + "=" + PROJECT_NAME
+            )
+        set_acl(client, key)
 
     # upload the predicted values
-    filename = f'{job_name}_predictions.csv'
-    key = f'{configure_prefix(JOBS_KEY, kwargs)}/{filename}'
+    if predictions is not None:
+        filename = f'{job_name}_predictions.csv'
+        key = f'{configure_prefix(JOBS_KEY, kwargs)}/{filename}'
 
-    predictions.to_csv(filename, index=None)
-    with open(filename, 'rb') as f:
-        response = client.put_object(
-            ACL='private',
-            Body=f,
-            Bucket=BUCKET,
-            Key=key,
-            Tagging=TAG_KEY + "=" + PROJECT_NAME
-        )
-    set_acl(client, key)
+        predictions.to_csv(filename, index=None)
+        with open(filename, 'rb') as f:
+            response = client.put_object(
+                ACL='private',
+                Body=f,
+                Bucket=BUCKET,
+                Key=key,
+                Tagging=TAG_KEY + "=" + PROJECT_NAME
+            )
+        set_acl(client, key)
 
 
 def get_results(job_name, include_predictions=False, kwargs={}):

@@ -5,6 +5,8 @@ configs
 *.zip
 *.model
 .idea
+temp/
+.DS_STORE
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

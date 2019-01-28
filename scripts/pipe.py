@@ -18,7 +18,7 @@ from tqdm import tqdm
 from scripts.constants import *
 
 
-def get_feature_names(kwargs={}):
+def get_feature_names(**kwargs):
     """get the list of feature names
 
     Returns:
@@ -48,7 +48,7 @@ def get_feature_names(kwargs={}):
     return features
 
 
-def validate_name(feature_name, kwargs={}):
+def validate_name(feature_name, **kwargs):
     """check whether or not a feature name is valid
 
     Args:
@@ -57,10 +57,10 @@ def validate_name(feature_name, kwargs={}):
     Returns:
         True if unique
     """
-    return feature_name not in get_feature_names(kwargs)
+    return feature_name not in get_feature_names(**kwargs)
 
 
-def upload_feature(feature_name, datasets, overwrite=False, kwargs={}):
+def upload_feature(feature_name, datasets, overwrite=False, **kwargs):
     """upload a feature to S3
 
     Args:
@@ -72,7 +72,7 @@ def upload_feature(feature_name, datasets, overwrite=False, kwargs={}):
     Returns:
         dict containing ETags of uploaded items by dataset
     """
-    if not validate_name(feature_name, kwargs) and not overwrite:
+    if not validate_name(feature_name, **kwargs) and not overwrite:
         raise ValueError(f'Feature name <{feature_name}> already in use')
 
     if any([not os.path.exists(p) for p in datasets if isinstance(p, str)]):
@@ -86,6 +86,10 @@ def upload_feature(feature_name, datasets, overwrite=False, kwargs={}):
         key = f'{configure_prefix(FEATURES_KEY, kwargs)}/{path}'
 
         if isinstance(feat, pd.DataFrame):
+            if not os.path.exists('tmp'):
+                os.mkdir('tmp')
+
+            path = os.path.join('tmp', path)
             feat.to_csv(path, index=None)
 
         with open(path, 'rb') as f:
@@ -122,7 +126,7 @@ def set_acl(client, key):
     )
 
 
-def download_feature(feature_name, kwargs={}):
+def download_feature(feature_name, **kwargs):
     """download a single feature
 
     Args:
@@ -132,7 +136,7 @@ def download_feature(feature_name, kwargs={}):
     Returns:
         pd.DataFrame
     """
-    if validate_name(feature_name, kwargs):
+    if validate_name(feature_name, **kwargs):
         raise ValueError(f'Feature <{feature_name}> does not exist')
 
     client = boto3.client('s3')
@@ -156,7 +160,7 @@ def download_feature(feature_name, kwargs={}):
     return result
 
 
-def build_feature_set(feature_names, max_concurrent_conn=-1, kwargs={}):
+def build_feature_set(feature_names, max_concurrent_conn=-1, **kwargs):
     """builds a Pandas DataFrame containing the requested features
 
     Args:
@@ -170,7 +174,10 @@ def build_feature_set(feature_names, max_concurrent_conn=-1, kwargs={}):
     max_conn = mul.cpu_count()*5 if max_concurrent_conn == -1 else max_concurrent_conn
 
     def download_wrapper(args):
-        return download_feature(*args)
+        if len(args) > 1:
+            return download_feature(args[0], **args[1])
+        else:
+            return download_feature(*args)
 
     pool = TPool(max_conn)
     result = list(pool.map(
@@ -195,7 +202,7 @@ def build_feature_set(feature_names, max_concurrent_conn=-1, kwargs={}):
     }
 
 
-def download_config(job_name, kwargs={}):
+def download_config(job_name, **kwargs):
     """download job config from S3
 
     Args:
@@ -204,7 +211,7 @@ def download_config(job_name, kwargs={}):
     Returns:
         dict
     """
-    if job_name not in get_jobs_listing(kwargs):
+    if job_name not in get_jobs_listing(**kwargs):
         raise ValueError(f'Job <{job_name}> has not been prepared')
 
     client = boto3.client('s3')
@@ -227,7 +234,7 @@ def download_config(job_name, kwargs={}):
     return config
 
 
-def get_jobs_listing(kwargs={}):
+def get_jobs_listing(**kwargs):
     """get the list of jobs
 
     Returns:
@@ -255,7 +262,7 @@ def get_jobs_listing(kwargs={}):
     return jobs_list
 
 
-def validate_job_name(job_name, kwargs={}):
+def validate_job_name(job_name, **kwargs):
     """
 
     Args:
@@ -265,10 +272,10 @@ def validate_job_name(job_name, kwargs={}):
     Returns:
         True if job_name has not been used
     """
-    return job_name not in get_jobs_listing(kwargs)
+    return job_name not in get_jobs_listing(**kwargs)
 
 
-def prepare_job(config, overwrite=False, kwargs={}):
+def prepare_job(config, overwrite=False, **kwargs):
     """prepare and load job to S3
 
     Args:
@@ -282,7 +289,7 @@ def prepare_job(config, overwrite=False, kwargs={}):
     if not isinstance(config, dict):
         raise TypeError
 
-    if not overwrite and config['job_name'] in get_jobs_listing(kwargs):
+    if not overwrite and config['job_name'] in get_jobs_listing(**kwargs):
         raise ValueError(f'{config["job_name"]} already in use')
 
     job_name = config['job_name']
@@ -312,9 +319,9 @@ def prepare_job(config, overwrite=False, kwargs={}):
             Bucket=BUCKET,
             Delete=dict(
                 Objects=[
-                    dict(key=f'{prefix}/{job_name}_predictions.csv'),
-                    dict(key=f'{prefix}/{job_name}_results.txt'),
-                    dict(key=f'{prefix}/{job_name}_log.txt')
+                    dict(Key=f'{prefix}/{job_name}_predictions.csv'),
+                    dict(Key=f'{prefix}/{job_name}_results.txt'),
+                    dict(Key=f'{prefix}/{job_name}_log.txt')
                 ],
                 Quiet=True
             )
@@ -323,7 +330,7 @@ def prepare_job(config, overwrite=False, kwargs={}):
     return config
 
 
-def prepare_init(job_name, kwargs={}):
+def prepare_init(job_name, **kwargs):
     """builds an initialization shell script for the EC2 instance
 
     Args:
@@ -362,7 +369,7 @@ def run_job(
         is_spot=True,
         ssh_key_name=None,
         ssh_key_path=None,
-        kwargs={}):
+        **kwargs):
     """
 
     Args:
@@ -377,7 +384,7 @@ def run_job(
     Returns:
 
     """
-    if job_name not in get_jobs_listing(kwargs):
+    if job_name not in get_jobs_listing(**kwargs):
         raise ValueError(f'Job <{job_name}> not prepared')
 
     # get the aws_region
@@ -563,7 +570,7 @@ def ec2sftp(public_dns, ssh_key_path=None):
             raise e
 
 
-def upload_results(job_name, result_summary, predictions, kwargs={}):
+def upload_results(job_name, result_summary, predictions, **kwargs):
     """upload result summary and predicted values to S3
 
     Args:
@@ -575,7 +582,7 @@ def upload_results(job_name, result_summary, predictions, kwargs={}):
     Returns:
         None
     """
-    if job_name not in get_jobs_listing(kwargs):
+    if job_name not in get_jobs_listing(**kwargs):
         raise ValueError(f'Job <{job_name}> has not been prepared')
 
     client = boto3.client('s3')
@@ -610,7 +617,7 @@ def upload_results(job_name, result_summary, predictions, kwargs={}):
         set_acl(client, key)
 
 
-def get_results(job_name, include_predictions=False, kwargs={}):
+def get_results(job_name, include_predictions=False, **kwargs):
     """retrieve validation results from S3
 
     Args:
@@ -621,17 +628,17 @@ def get_results(job_name, include_predictions=False, kwargs={}):
     Returns:
         dict
     """
-    if job_name + '_results.txt' not in get_jobs_listing(kwargs):
+    if job_name + '_results.txt' not in get_jobs_listing(**kwargs):
         raise ValueError(f'Job <{job_name}> has not reported results')
 
     results = {}
     client = boto3.client('s3')
 
     # get the config
-    results['config'] = download_config(job_name, kwargs)
+    results['config'] = download_config(job_name, **kwargs)
 
     # get the results summary
-    key = f'{configure_prefix(JOBS_KEY, kwargs)}/{job_name}_results.txt'
+    key = f'{configure_prefix(JOBS_KEY, **kwargs)}/{job_name}_results.txt'
     obj = client.get_object(
         Bucket=BUCKET,
         Key=key

@@ -1,6 +1,7 @@
+import base64
 from contextlib import contextmanager
 import datetime as dt
-from io import BytesIO, StringIO
+from io import BytesIO
 import json
 import multiprocessing as mul
 from multiprocessing.dummy import Pool as TPool
@@ -13,7 +14,6 @@ from botocore.exceptions import ClientError
 import jsonschema
 import pandas as pd
 import paramiko
-from tqdm import tqdm
 
 from scripts.constants import *
 
@@ -275,219 +275,222 @@ def validate_job_name(job_name, **kwargs):
     return job_name not in get_jobs_listing(**kwargs)
 
 
-def prepare_job(config, overwrite=False, **kwargs):
-    """prepare and load job to S3
+class Ec2Job(object):
+    def __init__(self, config,
+                 overwrite=False,
+                 aws_region=None,
+                 instance_type=None,
+                 ssh_key_name=None,
+                 ssh_key_path=None,
+                 **kwargs):
+        self.config = config
+        self.job_name = config['job_name']
+        self.instance = None
+        self.iid = None
 
-    Args:
-        config: (dict) matching schema defined in constants.py
-        overwrite: (bool) set to True to overwrite a job. Logs, results, and predictions will be removed from S3
-        kwargs:
+        # get the aws_region
+        if aws_region is None and 'AWS_DEFAULT_REGION' in SECRETS.keys():
+            self.region = SECRETS['AWS_DEFAULT_REGION']
+        else:
+            self.region = AWS_DEFAULT_REGION
 
-    Returns:
-        dict
-    """
-    if not isinstance(config, dict):
-        raise TypeError
+        # get the instance type
+        if instance_type is None and 'AWS_DEFAULT_INSTANCE_TYPE' in SECRETS.keys():
+            self.instance_type = SECRETS['AWS_DEFAULT_INSTANCE_TYPE']
+        else:
+            raise ValueError('InstanceType must be defined in SECRETS or instance_details')
 
-    if not overwrite and config['job_name'] in get_jobs_listing(**kwargs):
-        raise ValueError(f'{config["job_name"]} already in use')
+        self._client = boto3.client('ec2', region_name=self.region)
+        self._resource = boto3.resource('ec2', region_name=self.region)
 
-    job_name = config['job_name']
-    config = json.dumps(config)
-    jsonschema.validate(config, SCHEMA)
-    prefix = configure_prefix(JOBS_KEY, kwargs)
+        # add the ssh key if it exists
+        if ssh_key_name is None and 'AWS_KEY_PAIR_NAME' not in SECRETS.keys():
+            print('WARNING: no SSH Key found for remote monitoring')
+        elif ssh_key_name is None:
+            self.ssh_key_name = SECRETS['AWS_KEY_PAIR_NAME']
 
-    client = boto3.client('s3')
-    key = f'{prefix}/{job_name}_config'
+        if ssh_key_path is not None:
+            self.ssh_key_path = ssh_key_path
+        else:
+            self.ssh_key_path = SECRETS['AWS_KEY_PAIR_PATH']
 
-    with BytesIO(bytes(config, encoding='utf-8')) as f:
-        response = client.put_object(
-            ACL='private',
-            Body=f,
-            Bucket=BUCKET,
-            Key=key,
-            Tagging=TAG_KEY + "=" + PROJECT_NAME
-        )
-    set_acl(client, key)
+        self.security_group = set_security_groups(self._client)
 
-    config = json.loads(config)
-    config['submit_time'] = dt.datetime.now().isoformat()
-    config['status_code'] = response['ResponseMetadata']['HTTPStatusCode']
-
-    if overwrite:
-        response = client.delete_objects(
-            Bucket=BUCKET,
-            Delete=dict(
-                Objects=[
-                    dict(Key=f'{prefix}/{job_name}_predictions.csv'),
-                    dict(Key=f'{prefix}/{job_name}_results.txt'),
-                    dict(Key=f'{prefix}/{job_name}_log.txt')
-                ],
-                Quiet=True
-            )
-        )
-
-    return config
-
-
-def prepare_init(job_name, **kwargs):
-    """builds an initialization shell script for the EC2 instance
-
-    Args:
-        job_name: (str) name of job
-
-    Returns:
-        str
-    """
-    if 'test' in kwargs.keys():
-        p = os.path.join(os.path.abspath('..'), 'scripts', 'init.sh')
-    else:
-        p = 'init.sh'
-
-    with open(p, 'r') as f:
-        init = f.read()
-
-    init = init.replace(
-        "!aws_access_key_id!", SECRETS['AWS_ACCESS_KEY_ID']
-    ).replace(
-        "!aws_secret_access_key!", SECRETS['AWS_SECRET_ACCESS_KEY']
-    ).replace(
-        "!kaggle_username!", SECRETS['KAGGLE_USERNAME']
-    ).replace(
-        "!kaggle_key!", SECRETS['KAGGLE_KEY']
-    ).replace(
-        "!job_name!", job_name
-    )
-
-    return init
-
-
-def run_job(
-        job_name,
-        aws_region=None,
-        instance_type=None,
-        is_spot=True,
-        ssh_key_name=None,
-        ssh_key_path=None,
-        **kwargs):
-    """
-
-    Args:
-        job_name: (str) - name of job to reference in S3
-        aws_region: (str) - AWS region to build instance and security groups
-        instance_type: (str) - ie. t3.nane | c4.xlarge | ...
-        is_spot: (bool) - set to True to initialize as a spot request
-        ssh_key_name: (str) - name of key pair in AWS
-        ssh_key_path: (str) - path to private key on local machine
-        kwargs:
-
-    Returns:
-
-    """
-    if job_name not in get_jobs_listing(**kwargs):
-        raise ValueError(f'Job <{job_name}> not prepared')
-
-    # get the aws_region
-    if aws_region is None and 'AWS_DEFAULT_REGION' in SECRETS.keys():
-        region = SECRETS['AWS_DEFAULT_REGION']
-    else:
-        region = AWS_DEFAULT_REGION
-
-    # get the instance type
-    if instance_type is None and 'AWS_DEFAULT_INSTANCE_TYPE' in SECRETS.keys():
-        instance_type = SECRETS['AWS_DEFAULT_INSTANCE_TYPE']
-    else:
-        raise ValueError('InstanceType must be defined in SECRETS or instance_details')
-
-    ec2_client = boto3.client('ec2', region_name=region)
-
-    try:
-        security_group = ec2_client.create_security_group(
-            Description=f'{PROJECT_NAME} inbound ssh',
-            GroupName=PROJECT_NAME
-        )
-
-        this_ip = requests.get('http://ip.42.pl/raw').text + '/32'
-        ec2_client.authorize_security_group_ingress(
-            GroupId=security_group['GroupId'],
-            IpPermissions=[
-                dict(
-                    IpProtocol='tcp',
-                    FromPort=22,
-                    ToPort=22,
-                    IpRanges=[dict(CidrIp=this_ip)]
-                )
-            ]
-        )
-
-        security_group = security_group['GroupId']
-    except ClientError as e:
-        if 'InvalidGroup.Duplicate' in e.response['Error']['Code']:
-            security_group = ec2_client.describe_security_groups(
-                GroupNames=[PROJECT_NAME]
-            )
-            if len(security_group['SecurityGroups']) > 0:
-                security_group = security_group['SecurityGroups'][0]['GroupId']
+        try:
+            self.prepare_job(overwrite, **kwargs)
+        except ValueError as e:
+            if 'already in use' in e.args:
+                print(e.args)
+                print('Run prepare_jobs again with overwrite to overwrite the existing job')
             else:
                 raise e
-        else:
-            raise e
 
-    iargs = dict(
-        ImageId=AMI,
-        InstanceType=instance_type,
-        SecurityGroupIds=[security_group],
-        UserData=prepare_init(job_name, kwargs=kwargs),
-        DisableApiTermination=False,
-        EbsOptimized=True,
-        TagSpecifications=[
-            {
-                'ResourceType': 'instance',
-                'Tags': [
-                    {
-                        'Key': TAG_KEY,
-                        'Value': PROJECT_NAME
-                    },
-                ]
-            },
-        ],
-        MaxCount=1,
-        MinCount=1,
-        Monitoring=dict(Enabled=False)
-    )
+    def __repr__(self):
+        ins = f'{self.instance.instance_id} is {self.instance.state["Name"]}' \
+            if self.instance is not None else "no instance attached"
+        return f'Ec2Job <({self.config["job_name"]}, {ins})>'
 
-    # verify spot request
-    if is_spot:
-        iargs['InstanceMarketOptions'] = {
-            'MarketType': 'spot',
-            'SpotOptions': {
-                'SpotInstanceType': 'one-time',
-                'InstanceInterruptionBehavior': 'terminate'
+    def __prepare_init(self):
+        """builds an initialization shell script for the EC2 instance
+
+        Args:
+            job_name: (str) name of job
+
+        Returns:
+            str
+        """
+        p = 'init.sh'
+        with open(p, 'r') as f:
+            init = f.read()
+
+        init = init.replace(
+            "!aws_access_key_id!", SECRETS['AWS_ACCESS_KEY_ID']
+        ).replace(
+            "!aws_secret_access_key!", SECRETS['AWS_SECRET_ACCESS_KEY']
+        ).replace(
+            "!kaggle_username!", SECRETS['KAGGLE_USERNAME']
+        ).replace(
+            "!kaggle_key!", SECRETS['KAGGLE_KEY']
+        ).replace(
+            "!job_name!", self.job_name
+        )
+
+        return init
+
+    def prepare_job(self, overwrite=False, **kwargs):
+        """prepare and load job to S3
+
+        Args:
+            overwrite: (bool) set to True to overwrite a job. Logs, results, and predictions will be removed from S3
+            kwargs:
+
+        Returns:
+            dict
+        """
+        if not isinstance(self.config, dict):
+            raise TypeError
+
+        if not overwrite and self.config['job_name'] in get_jobs_listing(**kwargs):
+            raise ValueError(f'{self.config["job_name"]} already in use')
+
+        job_name = self.config['job_name']
+        config = json.dumps(self.config)
+        jsonschema.validate(config, SCHEMA)
+        prefix = configure_prefix(JOBS_KEY, kwargs)
+
+        client = boto3.client('s3')
+        key = f'{prefix}/{job_name}_config'
+
+        with BytesIO(bytes(config, encoding='utf-8')) as f:
+            response = client.put_object(
+                ACL='private',
+                Body=f,
+                Bucket=BUCKET,
+                Key=key,
+                Tagging=TAG_KEY + "=" + PROJECT_NAME
+            )
+        set_acl(client, key)
+
+        config = json.loads(config)
+        config['submit_time'] = dt.datetime.now().isoformat()
+        config['status_code'] = response['ResponseMetadata']['HTTPStatusCode']
+
+        if overwrite:
+            response = client.delete_objects(
+                Bucket=BUCKET,
+                Delete=dict(
+                    Objects=[
+                        dict(Key=f'{prefix}/{job_name}_predictions.csv'),
+                        dict(Key=f'{prefix}/{job_name}_results.txt'),
+                        dict(Key=f'{prefix}/{job_name}_log.txt')
+                    ],
+                    Quiet=True
+                )
+            )
+
+        return config
+
+    def run_job(self, is_spot=True, **kwargs):
+        """
+
+        Args:
+            is_spot: (bool) - set to True to initialize as a spot request
+            kwargs:
+
+        Returns:
+
+        """
+        if self.job_name not in get_jobs_listing(**kwargs):
+            raise ValueError(f'Job <{self.job_name}> not prepared')
+
+        iargs = dict(
+            ImageId=AMI,
+            InstanceType=self.instance_type,
+            SecurityGroupIds=[self.security_group],
+            UserData=self.__prepare_init(),
+            DisableApiTermination=False,
+            EbsOptimized=True,
+            TagSpecifications=[
+                {
+                    'ResourceType': 'instance',
+                    'Tags': [
+                        {
+                            'Key': TAG_KEY,
+                            'Value': PROJECT_NAME
+                        },
+                    ]
+                },
+            ],
+            MaxCount=1,
+            MinCount=1,
+            Monitoring=dict(Enabled=False)
+        )
+
+        # verify spot request
+        if is_spot:
+            iargs['InstanceMarketOptions'] = {
+                'MarketType': 'spot',
+                'SpotOptions': {
+                    'SpotInstanceType': 'one-time',
+                    'InstanceInterruptionBehavior': 'terminate'
+                }
             }
-        }
 
-    # add the ssh key if it exists
-    if ssh_key_name is None and 'AWS_KEY_PAIR_NAME' not in SECRETS.keys():
-        print('WARNING: no SSH Key found for remote monitoring')
-    elif ssh_key_name is None:
-        ssh_key_name = SECRETS['AWS_KEY_PAIR_NAME']
+        if self.ssh_key_name is not None:
+            iargs['KeyName'] = self.ssh_key_name
 
-    if ssh_key_name is not None:
-        iargs['KeyName'] = ssh_key_name
+        print(f'initializing EC2 instance')
+        start = time.time()
 
-    start = time.time()
-    ec2_resource = boto3.resource('ec2', region_name=region)
-    instance = ec2_resource.create_instances(**iargs)[0]
-    iid = instance.instance_id
+        self.instance = self._resource.create_instances(**iargs)[0]
+        self.iid = self.instance.instance_id
 
-    instance.wait_until_running()
-    instance.load()
+        self.instance.wait_until_running()
+        self.instance.load()
 
-    try:
-        time.sleep(30)
-        with ec2sftp(instance.public_dns_name, ssh_key_path) as svr:
+        try:
+            time.sleep(30)
+            self.monitor()
+
+            results = get_results(self.job_name, include_predictions=True, kwargs=kwargs)
+            results['instance_id'] = self.iid
+            results['run_time'] = pd.Timedelta(seconds=(time.time()-start))
+
+            self.terminate_instance()
+            return results
+        except Exception as e:
+            results = dict(
+                instance_id=self.iid,
+                run_time='WARNING: your instance is still running',
+                exception=e
+            )
+            return results
+
+    def monitor(self):
+        print(f'establishing connection with {self.instance.public_dns_name}')
+        with ec2sftp(self.instance.public_dns_name, self.ssh_key_path) as svr:
             finished, i = False, 0
-            log_file, log = f'{job_name}_log.txt', []
+            log_file, log = f'{self.job_name}_log.txt', []
 
             while not finished:
                 try:
@@ -517,35 +520,125 @@ def run_job(
                     else:
                         time.sleep(10)
 
-        ec2_client.terminate_instances(InstanceIds=[iid])
+    def terminate_instance(self):
+        try:
+            response = self._client.terminate_instances(InstanceIds=[self.iid])
+            return response
+        except Exception as e:
+            print()
+            print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+            print('!! WARNING: your instance is still running !!')
+            print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+            print(e.args)
+            print()
 
-        results = get_results(job_name, include_predictions=True, kwargs=kwargs)
-        results['instance_id'] = iid
-        results['run_time'] = pd.Timedelta(seconds=(time.time()-start))
-        return results
-    except Exception as e:
-        print()
-        print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-        print('WARNING: your instance is still running')
-        print('---------------------------------------')
-        results = dict(
-            instance_id=iid,
-            run_time='WARNING: your instance is still running',
-            exception=e
+
+def get_results(job_name, include_predictions=False, **kwargs):
+    """retrieve validation results from S3
+
+    Args:
+        job_name: (str) name of job
+        include_predictions: (bool) set to True to include predicted values
+        kwargs:
+
+    Returns:
+        dict
+    """
+    if job_name + '_results.txt' not in get_jobs_listing(**kwargs):
+        raise ValueError(f'Job <{job_name}> has not reported results')
+
+    results = {}
+    client = boto3.client('s3')
+
+    # get the config
+    results['config'] = download_config(job_name, **kwargs)
+
+    # get the results summary
+    key = f'{configure_prefix(JOBS_KEY, **kwargs)}/{job_name}_results.txt'
+    obj = client.get_object(
+        Bucket=BUCKET,
+        Key=key
+    )
+    if obj['ContentLength'] > 10:
+        with BytesIO(obj['Body'].read()) as f:
+            summary = f.read()
+
+        results['summary'] = summary
+    else:
+        results['summary'] = 'Job not ran'
+
+    # get the predictions
+    if include_predictions:
+        key = f'{configure_prefix(JOBS_KEY, kwargs)}/{job_name}_predictions.csv'
+        obj = client.get_object(
+            Bucket=BUCKET,
+            Key=key
         )
-        return results
+        if obj['ContentLength'] > 10:
+            bio = BytesIO(obj['Body'].read())
+
+            results['predictions'] = pd.read_csv(bio)
+
+            bio.close()
+            del bio
+        else:
+            results['predictions'] = None
+
+    return results
+
+
+def set_ingress(security_group, client):
+    try:
+        this_ip = requests.get('http://ip.42.pl/raw').text + '/32'
+        client.authorize_security_group_ingress(
+            GroupId=security_group,
+            IpPermissions=[
+                dict(
+                    IpProtocol='tcp',
+                    FromPort=22,
+                    ToPort=22,
+                    IpRanges=[dict(CidrIp=this_ip)]
+                )
+            ]
+        )
+    except ClientError as e:
+        if 'InvalidGroup.Duplicate' in e.response['Error']['Code']:
+            pass
+
+
+def set_security_groups(client):
+    try:
+        security_group = client.create_security_group(
+            Description=f'{PROJECT_NAME} inbound ssh',
+            GroupName=PROJECT_NAME
+        )
+
+        security_group = security_group['GroupId']
+        set_ingress(security_group, client)
+
+        print(f'Created security group with id: {security_group}')
+        return security_group
+    except ClientError as e:
+        if 'InvalidGroup.Duplicate' in e.response['Error']['Code']:
+            security_group = client.describe_security_groups(
+                GroupNames=[PROJECT_NAME]
+            )
+            if len(security_group['SecurityGroups']) > 0:
+                security_group = security_group['SecurityGroups'][0]['GroupId']
+                set_ingress(security_group, client)
+
+                return security_group
+            else:
+                raise e
+        else:
+            raise e
 
 
 @contextmanager
-def ec2sftp(public_dns, ssh_key_path=None):
+def ec2sftp(public_dns, ssh_key_path):
     server = paramiko.SSHClient()
     server.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     connected, attempts = False, 0
-
-    if ssh_key_path is None and 'AWS_KEY_PAIR_PATH' not in SECRETS.keys():
-        raise KeyError('You must provide and AWS key pair name and path to connect to the instance')
-    else:
-        ssh_key_path = SECRETS['AWS_KEY_PAIR_PATH']
 
     while not connected:
         try:
@@ -615,60 +708,6 @@ def upload_results(job_name, result_summary, predictions, **kwargs):
                 Tagging=TAG_KEY + "=" + PROJECT_NAME
             )
         set_acl(client, key)
-
-
-def get_results(job_name, include_predictions=False, **kwargs):
-    """retrieve validation results from S3
-
-    Args:
-        job_name: (str) name of job
-        include_predictions: (bool) set to True to include predicted values
-        kwargs:
-
-    Returns:
-        dict
-    """
-    if job_name + '_results.txt' not in get_jobs_listing(**kwargs):
-        raise ValueError(f'Job <{job_name}> has not reported results')
-
-    results = {}
-    client = boto3.client('s3')
-
-    # get the config
-    results['config'] = download_config(job_name, **kwargs)
-
-    # get the results summary
-    key = f'{configure_prefix(JOBS_KEY, **kwargs)}/{job_name}_results.txt'
-    obj = client.get_object(
-        Bucket=BUCKET,
-        Key=key
-    )
-    if obj['ContentLength'] > 10:
-        with BytesIO(obj['Body'].read()) as f:
-            summary = f.read()
-
-        results['summary'] = summary
-    else:
-        results['summary'] = 'Job not ran'
-
-    # get the predictions
-    if include_predictions:
-        key = f'{configure_prefix(JOBS_KEY, kwargs)}/{job_name}_predictions.csv'
-        obj = client.get_object(
-            Bucket=BUCKET,
-            Key=key
-        )
-        if obj['ContentLength'] > 10:
-            bio = BytesIO(obj['Body'].read())
-
-            results['predictions'] = pd.read_csv(bio)
-
-            bio.close()
-            del bio
-        else:
-            results['predictions'] = None
-
-    return results
 
 
 def configure_prefix(key, kwargs):

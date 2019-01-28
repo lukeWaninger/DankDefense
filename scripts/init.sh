@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 export AWS_ACCESS_KEY_ID="!aws_access_key_id!"
 export AWS_SECRET_ACCESS_KEY="!aws_secret_access_key!"
@@ -19,8 +19,8 @@ cd /home/ubuntu
 
 log_message $"starting job"
 log_message $"downloading base data"
-mkdir data
-aws s3 cp s3://dank-defense/data data --recursive
+mkdir data \n
+aws s3 cp s3://dank-defense/data data --recursive \n
 
 log_message $"downloading pipeline scripts"
 mkdir pipe
@@ -30,7 +30,7 @@ log_message $"installing Python requirements"
 pip install --user -r scripts/requirements.txt &>> $LOGFILE
 
 log_message $"modelling"
-python scripts/build_model.py --job=$JOB &>> $LOGFILE
+python scripts/runner.py --job=$JOB &>> $LOGFILE
 
 log_message $"uploading logs"
 aws s3 cp $LOGFILE s3://dank-defense/jobs/$LOGFILE

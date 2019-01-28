@@ -91,4 +91,3 @@ with open(os.path.join(Path.home(), 'DD_SECRETS'), 'r') as f:
 
     for secret in SECRETS:
         os.environ[secret] = SECRETS[secret]
-

@@ -295,7 +295,9 @@ class Ec2Job(object):
             self.region = AWS_DEFAULT_REGION
 
         # get the instance type
-        if instance_type is None and 'AWS_DEFAULT_INSTANCE_TYPE' in SECRETS.keys():
+        if instance_type is not None:
+            self.instance_type = instance_type
+        elif 'AWS_DEFAULT_INSTANCE_TYPE' in SECRETS.keys():
             self.instance_type = SECRETS['AWS_DEFAULT_INSTANCE_TYPE']
         else:
             raise ValueError('InstanceType must be defined in SECRETS or instance_details')

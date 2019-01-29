@@ -4,11 +4,16 @@ The "train -> validate -> predict" pipeline.
 
 import argparse
 import pandas as pd
-import scripts.pipe as pipe
 import importlib
 import itertools
 import copy
 from sklearn.metrics import roc_auc_score, accuracy_score, confusion_matrix, classification_report
+
+import os
+if 'pipe.py' in os.listdir('.'):
+    import pipe
+else:
+    from scripts import pipe
 
 
 def fetch_data(job_name, **kwargs):
@@ -63,7 +68,7 @@ def run_task(config):
         None
     """
     task = config['task']
-    job = config['job']
+    job = config['job_name']
 
     if task == 'validate':
         results = validate(config, config['model']['parameters'])
@@ -219,7 +224,7 @@ def main():
     parser = argparse.ArgumentParser(description='--')
     parser.add_argument('job', type=str, help='HELP!')
 
-    job_name = parser.parse_args().job_name
+    job_name = parser.parse_args().job
     config = fetch_data(job_name)
     run_task(config)
 

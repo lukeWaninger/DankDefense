@@ -8,8 +8,7 @@ export JOB="!job_name!"
 
 export LOGFILE=$JOB\_log.txt
 
-apt-get -y install python3-pip
-pip3 install awscli
+pip install awscli
 
 log_message()
 {
@@ -24,14 +23,13 @@ mkdir data
 aws s3 cp s3://dank-defense/data data --recursive
 
 log_message $"downloading pipeline scripts"
-aws s3 cp s3://dank-defense/scripts . --recursive
+aws s3 cp s3://dank-defense/scripts scripts --recursive
 
 log_message $"installing Python requirements"
+pip install --user -r scripts/requirements.txt &>> $LOGFILE
 
-pip3 install -r requirements.txt &>> $LOGFILE
-
-log_message $"executing runner"
-python3 runner.py $JOB &>> $LOGFILE
+log_message $"modelling"
+python scripts/runner.py --job=$JOB &>> $LOGFILE
 
 log_message $"uploading logs"
 aws s3 cp $LOGFILE s3://dank-defense/jobs/$LOGFILE

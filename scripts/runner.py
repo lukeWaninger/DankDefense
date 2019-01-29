@@ -68,7 +68,7 @@ def run_task(config):
         None
     """
     task = config['task']
-    job = config['job']
+    job = config['job_name']
 
     if task == 'validate':
         results = validate(config, config['model']['parameters'])
@@ -219,7 +219,7 @@ def main():
     parser = argparse.ArgumentParser(description='--')
     parser.add_argument('job', type=str, help='HELP!')
 
-    job_name = parser.parse_args().job_name
+    job_name = parser.parse_args().job
     config = fetch_data(job_name)
     run_task(config)
 

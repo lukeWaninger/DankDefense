@@ -4,6 +4,7 @@ from io import BytesIO
 import json
 import multiprocessing as mul
 from multiprocessing.dummy import Pool as TPool
+import os
 import re
 import requests
 import time
@@ -14,7 +15,10 @@ import jsonschema
 import pandas as pd
 import paramiko
 
-from scripts.constants import *
+if 'constants.py' in os.listdir('.'):
+    import constants as const
+else:
+    import scripts.constants as const
 
 
 def get_feature_names(**kwargs):
@@ -27,18 +31,18 @@ def get_feature_names(**kwargs):
 
     # TODO: Paginate. will fail over 300 features
     response = client.list_objects_v2(
-        Bucket=BUCKET,
+        Bucket=const.BUCKET,
         Delimiter=',',
-        Prefix=configure_prefix(FEATURES_KEY, kwargs),
+        Prefix=configure_prefix(const.FEATURES_KEY, kwargs),
         MaxKeys=1000,
     )
 
     contents = response.get('Contents')
     if contents is not None and len(contents) > 1:
-        prefix = configure_prefix(FEATURES_KEY, kwargs)
+        prefix = configure_prefix(const.FEATURES_KEY, kwargs)
 
         features = list({
-            re.sub(r'(/|.csv|_' + '|_'.join(DATASET_KEYS) + '|' + prefix + ')+', '', c['Key'])
+            re.sub(r'(/|.csv|_' + '|_'.join(const.DATASET_KEYS) + '|' + prefix + ')+', '', c['Key'])
             for c in contents[1:]
     })
     else:
@@ -80,9 +84,9 @@ def upload_feature(feature_name, datasets, overwrite=False, **kwargs):
     client = boto3.client('s3')
     etags = {}
 
-    for feat, dataset in zip(datasets, DATASET_KEYS):
+    for feat, dataset in zip(datasets, const.DATASET_KEYS):
         path = f'{feature_name}_{dataset}.csv'
-        key = f'{configure_prefix(FEATURES_KEY, kwargs)}/{path}'
+        key = f'{configure_prefix(const.FEATURES_KEY, kwargs)}/{path}'
 
         if isinstance(feat, pd.DataFrame):
             if not os.path.exists('tmp'):
@@ -95,9 +99,9 @@ def upload_feature(feature_name, datasets, overwrite=False, **kwargs):
             response = client.put_object(
                 ACL='private',
                 Body=f,
-                Bucket=BUCKET,
+                Bucket=const.BUCKET,
                 Key=key,
-                Tagging=TAG_KEY + "=" + PROJECT_NAME
+                Tagging=const.TAG_KEY + "=" + const.PROJECT_NAME
             )
         set_acl(client, key)
 
@@ -115,11 +119,11 @@ def set_acl(client, key):
     Returns:
         None
     """
-    acl = client.get_bucket_acl(Bucket=BUCKET)
+    acl = client.get_bucket_acl(Bucket=const.BUCKET)
     del acl['ResponseMetadata']
 
     client.put_object_acl(
-        Bucket=BUCKET,
+        Bucket=const.BUCKET,
         Key=key,
         AccessControlPolicy=acl
     )
@@ -141,11 +145,11 @@ def download_feature(feature_name, **kwargs):
     client = boto3.client('s3')
 
     result = {}
-    for dataset in DATASET_KEYS:
-        key = f'{configure_prefix(FEATURES_KEY, kwargs)}/{feature_name}_{dataset}.csv'
+    for dataset in const.DATASET_KEYS:
+        key = f'{configure_prefix(const.FEATURES_KEY, kwargs)}/{feature_name}_{dataset}.csv'
 
         obj = client.get_object(
-            Bucket=BUCKET,
+            Bucket=const.BUCKET,
             Key=key,
         )
         if obj['ContentLength'] > 10:
@@ -197,7 +201,7 @@ def build_feature_set(feature_names, max_concurrent_conn=-1, **kwargs):
             'x': recursive_join([ri[key] for ri in result]),
             'y': target[key] if key != 'test' else None
         }
-        for key in DATASET_KEYS
+        for key in const.DATASET_KEYS
     }
 
 
@@ -215,15 +219,15 @@ def download_config(job_name, **kwargs):
 
     client = boto3.client('s3')
 
-    key = f'{configure_prefix(JOBS_KEY, kwargs)}/{job_name}_config'
+    key = f'{configure_prefix(const.JOBS_KEY, kwargs)}/{job_name}_config'
     obj = client.get_object(
-        Bucket=BUCKET,
+        Bucket=const.BUCKET,
         Key=key
     )
     if obj['ContentLength'] > 10:
         bio = BytesIO(obj['Body'].read())
         config = json.load(bio)
-        jsonschema.validate(config, SCHEMA)
+        jsonschema.validate(config, const.SCHEMA)
 
         bio.close()
         del bio
@@ -243,16 +247,16 @@ def get_jobs_listing(**kwargs):
 
     # TODO: Paginate. will fail over 300
     response = client.list_objects_v2(
-        Bucket=BUCKET,
+        Bucket=const.BUCKET,
         Delimiter=',',
-        Prefix=configure_prefix(JOBS_KEY, kwargs),
+        Prefix=configure_prefix(const.JOBS_KEY, kwargs),
         MaxKeys=1000,
     )
 
     contents = response.get('Contents')
     if contents is not None and len(contents) > 1:
         jobs_list = list({
-            re.sub(r'(/|_config|' + configure_prefix(JOBS_KEY, kwargs) + ')+', '', c['Key'])
+            re.sub(r'(/|_config|' + configure_prefix(const.JOBS_KEY, kwargs) + ')+', '', c['Key'])
             for c in contents[1:]
     })
     else:
@@ -288,16 +292,16 @@ class Ec2Job(object):
         self.iid = None
 
         # get the aws_region
-        if aws_region is None and 'AWS_DEFAULT_REGION' in SECRETS.keys():
-            self.region = SECRETS['AWS_DEFAULT_REGION']
+        if aws_region is None and 'AWS_DEFAULT_REGION' in const.SECRETS.keys():
+            self.region = const.SECRETS['AWS_DEFAULT_REGION']
         else:
-            self.region = AWS_DEFAULT_REGION
+            self.region = const.AWS_DEFAULT_REGION
 
         # get the instance type
         if instance_type is not None:
             self.instance_type = instance_type
-        elif 'AWS_DEFAULT_INSTANCE_TYPE' in SECRETS.keys():
-            self.instance_type = SECRETS['AWS_DEFAULT_INSTANCE_TYPE']
+        elif 'AWS_DEFAULT_INSTANCE_TYPE' in const.SECRETS.keys():
+            self.instance_type = const.SECRETS['AWS_DEFAULT_INSTANCE_TYPE']
         else:
             raise ValueError('InstanceType must be defined in SECRETS or instance_details')
 
@@ -305,15 +309,15 @@ class Ec2Job(object):
         self._resource = boto3.resource('ec2', region_name=self.region)
 
         # add the ssh key if it exists
-        if ssh_key_name is None and 'AWS_KEY_PAIR_NAME' not in SECRETS.keys():
+        if ssh_key_name is None and 'AWS_KEY_PAIR_NAME' not in const.SECRETS.keys():
             print('WARNING: no SSH Key found for remote monitoring')
         elif ssh_key_name is None:
-            self.ssh_key_name = SECRETS['AWS_KEY_PAIR_NAME']
+            self.ssh_key_name = const.SECRETS['AWS_KEY_PAIR_NAME']
 
         if ssh_key_path is not None:
             self.ssh_key_path = ssh_key_path
         else:
-            self.ssh_key_path = SECRETS['AWS_KEY_PAIR_PATH']
+            self.ssh_key_path = const.SECRETS['AWS_KEY_PAIR_PATH']
 
         self.security_group = set_security_groups(self._client)
 
@@ -345,13 +349,13 @@ class Ec2Job(object):
             init = f.read()
 
         init = init.replace(
-            "!aws_access_key_id!", SECRETS['AWS_ACCESS_KEY_ID']
+            "!aws_access_key_id!", const.SECRETS['AWS_ACCESS_KEY_ID']
         ).replace(
-            "!aws_secret_access_key!", SECRETS['AWS_SECRET_ACCESS_KEY']
+            "!aws_secret_access_key!", const.SECRETS['AWS_SECRET_ACCESS_KEY']
         ).replace(
-            "!kaggle_username!", SECRETS['KAGGLE_USERNAME']
+            "!kaggle_username!", const.SECRETS['KAGGLE_USERNAME']
         ).replace(
-            "!kaggle_key!", SECRETS['KAGGLE_KEY']
+            "!kaggle_key!", const.SECRETS['KAGGLE_KEY']
         ).replace(
             "!job_name!", self.job_name
         )
@@ -376,8 +380,8 @@ class Ec2Job(object):
 
         job_name = self.config['job_name']
         config = json.dumps(self.config)
-        jsonschema.validate(config, SCHEMA)
-        prefix = configure_prefix(JOBS_KEY, kwargs)
+        jsonschema.validate(config, const.SCHEMA)
+        prefix = configure_prefix(const.JOBS_KEY, kwargs)
 
         client = boto3.client('s3')
         key = f'{prefix}/{job_name}_config'
@@ -386,9 +390,9 @@ class Ec2Job(object):
             response = client.put_object(
                 ACL='private',
                 Body=f,
-                Bucket=BUCKET,
+                Bucket=const.BUCKET,
                 Key=key,
-                Tagging=TAG_KEY + "=" + PROJECT_NAME
+                Tagging=const.TAG_KEY + "=" + const.PROJECT_NAME
             )
         set_acl(client, key)
 
@@ -398,7 +402,7 @@ class Ec2Job(object):
 
         if overwrite:
             response = client.delete_objects(
-                Bucket=BUCKET,
+                Bucket=const.BUCKET,
                 Delete=dict(
                     Objects=[
                         dict(Key=f'{prefix}/{job_name}_predictions.csv'),
@@ -425,7 +429,7 @@ class Ec2Job(object):
             raise ValueError(f'Job <{self.job_name}> not prepared')
 
         iargs = dict(
-            ImageId=AMI,
+            ImageId=const.AMI,
             InstanceType=self.instance_type,
             SecurityGroupIds=[self.security_group],
             UserData=self.__prepare_init(),
@@ -436,8 +440,8 @@ class Ec2Job(object):
                     'ResourceType': 'instance',
                     'Tags': [
                         {
-                            'Key': TAG_KEY,
-                            'Value': PROJECT_NAME
+                            'Key': const.TAG_KEY,
+                            'Value': const.PROJECT_NAME
                         },
                     ]
                 },
@@ -555,9 +559,9 @@ def get_results(job_name, include_predictions=False, **kwargs):
     results['config'] = download_config(job_name, **kwargs)
 
     # get the results summary
-    key = f'{configure_prefix(JOBS_KEY, **kwargs)}/{job_name}_results.txt'
+    key = f'{configure_prefix(const.JOBS_KEY, **kwargs)}/{job_name}_results.txt'
     obj = client.get_object(
-        Bucket=BUCKET,
+        Bucket=const.BUCKET,
         Key=key
     )
     if obj['ContentLength'] > 10:
@@ -570,9 +574,9 @@ def get_results(job_name, include_predictions=False, **kwargs):
 
     # get the predictions
     if include_predictions:
-        key = f'{configure_prefix(JOBS_KEY, kwargs)}/{job_name}_predictions.csv'
+        key = f'{configure_prefix(const.JOBS_KEY, kwargs)}/{job_name}_predictions.csv'
         obj = client.get_object(
-            Bucket=BUCKET,
+            Bucket=const.BUCKET,
             Key=key
         )
         if obj['ContentLength'] > 10:
@@ -610,8 +614,8 @@ def set_ingress(security_group, client):
 def set_security_groups(client):
     try:
         security_group = client.create_security_group(
-            Description=f'{PROJECT_NAME} inbound ssh',
-            GroupName=PROJECT_NAME
+            Description=f'{const.PROJECT_NAME} inbound ssh',
+            GroupName=const.PROJECT_NAME
         )
 
         security_group = security_group['GroupId']
@@ -622,7 +626,7 @@ def set_security_groups(client):
     except ClientError as e:
         if 'InvalidGroup.Duplicate' in e.response['Error']['Code']:
             security_group = client.describe_security_groups(
-                GroupNames=[PROJECT_NAME]
+                GroupNames=[const.PROJECT_NAME]
             )
             if len(security_group['SecurityGroups']) > 0:
                 security_group = security_group['SecurityGroups'][0]['GroupId']
@@ -658,7 +662,7 @@ def ec2sftp(public_dns, ssh_key_path):
             server.close()
         except TimeoutError as e:
             attempts += 1
-            if attempts == MAX_RETRIES:
+            if attempts == const.MAX_RETRIES:
                 raise e
         except Exception as e:
             raise e
@@ -683,30 +687,30 @@ def upload_results(job_name, result_summary, predictions, **kwargs):
 
     # upload the result summary
     if result_summary is not None:
-        key = f'{configure_prefix(JOBS_KEY, kwargs)}/{job_name}_results.txt'
+        key = f'{configure_prefix(const.JOBS_KEY, kwargs)}/{job_name}_results.txt'
         with BytesIO(bytes(result_summary, encoding='utf-8')) as f:
             response = client.put_object(
                 ACL='private',
                 Body=f,
-                Bucket=BUCKET,
+                Bucket=const.BUCKET,
                 Key=key,
-                Tagging=TAG_KEY + "=" + PROJECT_NAME
+                Tagging=const.TAG_KEY + "=" + const.PROJECT_NAME
             )
         set_acl(client, key)
 
     # upload the predicted values
     if predictions is not None:
         filename = f'{job_name}_predictions.csv'
-        key = f'{configure_prefix(JOBS_KEY, kwargs)}/{filename}'
+        key = f'{configure_prefix(const.JOBS_KEY, kwargs)}/{filename}'
 
         predictions.to_csv(filename, index=None)
         with open(filename, 'rb') as f:
             response = client.put_object(
                 ACL='private',
                 Body=f,
-                Bucket=BUCKET,
+                Bucket=const.BUCKET,
                 Key=key,
-                Tagging=TAG_KEY + "=" + PROJECT_NAME
+                Tagging=const.TAG_KEY + "=" + const.PROJECT_NAME
             )
         set_acl(client, key)
 

@@ -7,8 +7,8 @@ FEATURES_KEY = 'features'
 JOBS_KEY = 'jobs'
 TAG_KEY = 'Project'
 PROJECT_NAME = 'DankDefense'
-AMI = 'ami-0c6415e46854ac2d6'
-AWS_DEFAULT_REGION = 'umport s-east-1'
+AMI = 'ami-03174542b7ee7817b'
+AWS_DEFAULT_REGION = 'us-east-1'
 MAX_RETRIES = 5
 DATASET_KEYS = ['train', 'test', 'validate']
 
@@ -80,14 +80,17 @@ config:
 SCHEMA = yaml.load(config_schema)
 """https://lightgbm.readthedocs.io/en/latest/Parameters.html"""
 
-with open(os.path.join(Path.home(), 'DD_SECRETS'), 'r') as f:
-    cf = f.readlines()
+try:
+    with open(os.path.join(Path.home(), 'DD_SECRETS'), 'r') as f:
+        cf = f.readlines()
 
-    SECRETS = {
-        k: v for k, v in [
-            list(map(lambda x: x.strip(), l.split('=')))
-            for l in cf if not l.startswith('#')
-    ]}
+        SECRETS = {
+            k: v for k, v in [
+                list(map(lambda x: x.strip(), l.split('=')))
+                for l in cf if not l.startswith('#')
+        ]}
 
-    for secret in SECRETS:
-        os.environ[secret] = SECRETS[secret]
+        for secret in SECRETS:
+            os.environ[secret] = SECRETS[secret]
+except FileNotFoundError:
+    print('no secrets file found. resorting to environment variables')

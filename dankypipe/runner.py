@@ -9,11 +9,7 @@ import itertools
 import copy
 from sklearn.metrics import roc_auc_score, accuracy_score, confusion_matrix, classification_report
 
-import os
-if 'pipe.py' in os.listdir('.'):
-    import pipe
-else:
-    from dankypipe import pipe
+from dankypipe import pipe
 
 
 def fetch_data(job_name, **kwargs):

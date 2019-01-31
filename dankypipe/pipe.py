@@ -132,11 +132,12 @@ def set_acl(client, key):
     )
 
 
-def download_feature(feature_name, **kwargs):
+def download_feature(feature_name, cache=False, **kwargs):
     """download a single feature
 
     Args:
         feature_name: (str) name of feature
+        cache: (bool) set to True if you plan on using the instance for more than one job
         kwargs:
 
     Returns:
@@ -151,7 +152,7 @@ def download_feature(feature_name, **kwargs):
     for dataset in const.DATASET_KEYS:
         prefix = configure_prefix(const.FEATURES_KEY, kwargs)
 
-        if not os.path.exists(prefix):
+        if cache and not os.path.exists(prefix):
             os.mkdir(prefix)
 
         key = f'{prefix}/{feature_name}_{dataset}.csv'
@@ -167,7 +168,11 @@ def download_feature(feature_name, **kwargs):
                 bio = BytesIO(obj['Body'].read())
 
                 result[dataset] = pd.read_csv(bio)
-                result[dataset].to_csv(key, index=None)
+
+                if cache:
+                    result[dataset].to_csv(key, index=None)
+                else:
+                    pass
 
                 bio.close()
                 del bio

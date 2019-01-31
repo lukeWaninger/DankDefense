@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="dankypipe",
-    version="0.0.1",
+    version="0.0.2",
     author="Vivek Pagadala, Luke Waninger",
     author_email="luke.waninger@gmail.com",
     description="A dankly qualified validation pipeline",

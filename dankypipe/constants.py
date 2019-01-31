@@ -91,6 +91,7 @@ try:
                 list(map(lambda x: x.strip(), l.split('=')))
                 for l in cf if not l.startswith('#')
         ]}
+        print(SECRETS)
 
         for secret in SECRETS:
             os.environ[secret] = SECRETS[secret]

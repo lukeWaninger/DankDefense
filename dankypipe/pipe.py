@@ -118,7 +118,6 @@ def set_acl(key):
     """
     res = boto3.resource('s3')
     obj = res.ObjectAcl(const.BUCKET, key)
-
     acl = json.loads(const.SECRETS['AWS_ACL'].replace("'", '"'))
     result = obj.put(AccessControlPolicy=acl)
 
@@ -409,7 +408,9 @@ class Ec2Job(object):
         prefix = configure_prefix(const.JOBS_KEY, kwargs)
 
         client = boto3.client('s3')
+
         key = f'{prefix}/{job_name}_config'
+        print(const.TAG_KEY + "=" + const.PROJECT_NAME)
 
         with BytesIO(bytes(config, encoding='utf-8')) as f:
             response = client.put_object(
@@ -417,7 +418,7 @@ class Ec2Job(object):
                 Body=f,
                 Bucket=const.BUCKET,
                 Key=key,
-                Tagging=const.TAG_KEY + "=" + const.PROJECT_NAME
+                #Tagging=const.TAG_KEY + "=" + const.PROJECT_NAME
             )
         set_acl(key)
 
@@ -431,11 +432,7 @@ class Ec2Job(object):
                 Delete=dict(
                     Objects=[
                         dict(Key=f'{prefix}/{job_name}_predictions.csv'),
-                        dict(Key=f'{prefix}/{job_name}_results.txt'),
-                        dict(Key=f'{prefix}/{job_name}_log.txt')
-                    ],
-                    Quiet=True
-                )
+                        dict(Key=f'{prefix}/{job_name}_results.txt'), dict(Key=f'{prefix}/{job_name}_log.txt')], Quiet=True)
             )
 
         return config
@@ -467,7 +464,7 @@ class Ec2Job(object):
                 SecurityGroupIds=[self.security_group],
                 UserData=self.prepare_init(),
                 DisableApiTermination=False,
-                EbsOptimized=True,
+                EbsOptimized=False,
                 TagSpecifications=[
                     {
                         'ResourceType': 'instance',
@@ -758,10 +755,10 @@ def upload_results(job_name, result_summary, predictions, **kwargs):
                 Body=f,
                 Bucket=const.BUCKET,
                 Key=key,
-                Tagging=[
-                    f'Name={job_name}',
-                    const.TAG_KEY + "=" + const.PROJECT_NAME
-                ]
+                # Tagging=[
+                #     f'Name={job_name}',
+                #     const.TAG_KEY + "=" + const.PROJECT_NAME
+                # ]
             )
         set_acl(key)
 
@@ -777,10 +774,10 @@ def upload_results(job_name, result_summary, predictions, **kwargs):
                 Body=f,
                 Bucket=const.BUCKET,
                 Key=key,
-                Tagging=[
-                    f'Name={job_name}',
-                    const.TAG_KEY + "=" + const.PROJECT_NAME
-                ]
+                # Tagging=[
+                #     f'Name={job_name}',
+                #     const.TAG_KEY + "=" + const.PROJECT_NAME
+                # ]
             )
         set_acl(key)
 

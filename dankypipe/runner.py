@@ -11,7 +11,7 @@ import itertools
 import os
 import sys
 import copy
-from sklearn.metrics import roc_auc_score, accuracy_score, confusion_matrix, classification_report
+from sklearn.metrics import roc_auc_score, accuracy_score, confusion_matrix, classification_report, log_loss
 import time
 
 import dankypipe.constants as c
@@ -19,12 +19,15 @@ from dankypipe import pipe
 
 
 def fetch_data(job_name, **kwargs):
+    print('Fetching config...')
     config = pipe.download_config(job_name, **kwargs)
+    print('Downloading features...')
     config.update(pipe.build_feature_set(config['features'], **kwargs))
     config['train_all'] = {
         'x': pd.concat([config['train']['x'], config['validate']['x']], axis=0, sort=False),
         'y': pd.concat([config['train']['y'], config['validate']['y']], axis=0, sort=False)
     }
+    print('Feature set download complete')
 
     return config
 
@@ -32,17 +35,18 @@ def fetch_data(job_name, **kwargs):
 def metrics(y, yhat):
     return dict(
         auc=roc_auc_score(y, yhat),
-        accuracy=accuracy_score(y, yhat),
-        confusion_matrix=confusion_matrix(y, yhat),
-        classification_report=classification_report(y, yhat)
+        log_loss=log_loss(y, yhat),
+        accuracy=accuracy_score(y, yhat > 0.5),
+        confusion_matrix=confusion_matrix(y, yhat > 0.5),
+        classification_report=classification_report(y, yhat > 0.5)
     )
 
 
-def validate(config, parameters, kwargs):
+def validate(config, parameters):
     train = config['train']
     val = config['validate']
 
-    model = load_model(config)(parameters, kwargs)
+    model = load_model(config)(parameters)
     model.train(**train)
     yhat = model.predict(val['x'])
 
@@ -72,10 +76,9 @@ def run_task(config):
     task = config['task']
     job = config['job_name']
     params = config['model']['parameters']
-    kwargs = config['model']['kwargs'] if 'kwargs' in config['model'].keys() else {}
 
     if task == 'validate':
-        results = validate(config, params, kwargs)
+        results = validate(config, params)
         pipe.upload_results(job, str(results), None)
 
     elif task == 'predict':
@@ -83,7 +86,7 @@ def run_task(config):
         pipe.upload_results(job, None, predictions)
 
     elif task == 'validate_predict':
-        results = validate(config, params, kwargs)
+        results = validate(config, params)
         predictions = predict(config, params)
         pipe.upload_results(job, str(results), predictions)
 
@@ -134,7 +137,6 @@ def tune_stage_wise(config):
     parameters = copy.deepcopy(config['model']['parameters'])
     updates = config['tuning']['parameters']
     metric = config['tuning']['metric']
-    kwargs = config['model']['kwargs'] if 'kwargs' in config['model'].keys() else {}
 
     # initialize all params to the first value in their list
     for path, values in updates.items():
@@ -146,7 +148,7 @@ def tune_stage_wise(config):
         results = []
         for value in values:
             _update_dict(candidate_parameters, path, value)
-            res = validate(config, candidate_parameters, kwargs)
+            res = validate(config, candidate_parameters)
             results.append((candidate_parameters, res))
 
         parameters = max(results, key=lambda x: x[1][metric])[0]
@@ -163,7 +165,6 @@ def tune_grid(config):
         (best_params, [(params, metrics)])
     """
     parameters = config['model']['parameters']
-    kwargs = config['model']['kwargs'] if 'kwargs' in config['model'].keys() else {}
     updates = config['tuning']['parameters']
     metric = config['tuning']['metric']
     job = config['job_name']
@@ -186,10 +187,11 @@ def tune_grid(config):
         candidate_parameters['metric'] = metric
         for d in c:
             for k, v in d.items():
-                candidate_parameters[k] = v
+                _update_dict(candidate_parameters, k, v)
+                # candidate_parameters[k] = v
 
         candidate_parameters = dict(params=candidate_parameters)
-        res = validate(config, candidate_parameters, kwargs)
+        res = validate(config, candidate_parameters)
 
         log(job, res)
         results.append((candidate_parameters, res))

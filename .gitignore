@@ -1,4 +1,5 @@
-configs
+configs/
+data/
 
 # Misc
 *.csv
@@ -7,6 +8,7 @@ configs
 .idea
 temp/
 .DS_STORE
+.swp
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

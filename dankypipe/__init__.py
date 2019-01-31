@@ -6,6 +6,6 @@ __all__ = [
     'runner'
 ]
 
-import dankypipe.constants
-import dankypipe.runner
-import dankypipe.pipe
+import dankypipe.constants as constants
+import dankypipe.runner as runner
+import dankypipe.pipe as pipe

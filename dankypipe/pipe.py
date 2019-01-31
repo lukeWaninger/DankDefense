@@ -18,7 +18,7 @@ import paramiko
 if 'constants.py' in os.listdir('.'):
     import constants as const
 else:
-    import scripts.constants as const
+    import dankypipe.constants as const
 
 
 def get_feature_names(**kwargs):

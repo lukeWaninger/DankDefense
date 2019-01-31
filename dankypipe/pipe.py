@@ -103,6 +103,9 @@ def upload_feature(feature_name, datasets, overwrite=False, **kwargs):
         set_acl(client, key)
 
         etags[dataset] = response['ETag'].replace('"', '')
+
+        for tmp_file in os.listdir('tmp'):
+            os.remove(tmp_file)
     return etags
 
 

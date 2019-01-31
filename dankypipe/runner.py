@@ -13,7 +13,7 @@ import os
 if 'pipe.py' in os.listdir('.'):
     import pipe
 else:
-    from scripts import pipe
+    from dankypipe import pipe
 
 
 def fetch_data(job_name, **kwargs):

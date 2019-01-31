@@ -25,11 +25,12 @@ setuptools.setup(
         'numpy==1.16.0',
         'pandas==0.24.0',
         'paramiko==2.4.2',
+        'requests==2.19.1',
         'scikit-learn==0.20.2',
         'scipy==1.2.0',
         'tqdm==4.29.1',
         'urllib3==1.24.1'
-
+        'PyYaml==3.13'
     ],
     python_requires='>=3.6',
     include_package_data=True,

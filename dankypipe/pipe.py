@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 import datetime as dt
-from io import BytesIO
+from io import BytesIO, StringIO
 import json
 import multiprocessing as mul
 from multiprocessing.dummy import Pool as TPool
@@ -82,7 +82,7 @@ def upload_feature(feature_name, datasets, overwrite=False, **kwargs):
     etags = {}
 
     for feat, dataset in zip(datasets, const.DATASET_KEYS):
-        path = f'{feature_name}_{dataset}.csv'
+        path = f'{feature_name}_{dataset}.pickle'
         key = f'{configure_prefix(const.FEATURES_KEY, kwargs)}/{path}'
 
         if isinstance(feat, pd.DataFrame):
@@ -90,7 +90,7 @@ def upload_feature(feature_name, datasets, overwrite=False, **kwargs):
                 os.mkdir('tmp')
 
             path = os.path.join('tmp', path)
-            feat.to_csv(path, index=None)
+            feat.to_pickle(path, compression='gzip')
 
         with open(path, 'rb') as f:
             response = client.put_object(
@@ -155,9 +155,9 @@ def download_feature(feature_name, cache=False, **kwargs):
         if cache and not os.path.exists(prefix):
             os.mkdir(prefix)
 
-        key = f'{prefix}/{feature_name}_{dataset}.csv'
+        key = f'{prefix}/{feature_name}_{dataset}.pickle'
         if os.path.exists(key):
-            result[dataset] = pd.read_csv(key)
+            result[dataset] = pd.read_pickle(key)
 
         else:
             obj = client.get_object(
@@ -165,9 +165,9 @@ def download_feature(feature_name, cache=False, **kwargs):
                 Key=key,
             )
             if obj['ContentLength'] > 10:
-                bio = BytesIO(obj['Body'].read())
+                bio = StringIO(obj['Body'].read())
 
-                result[dataset] = pd.read_csv(bio)
+                result[dataset] = pd.read_pickle(bio.read())
 
                 if cache:
                     result[dataset].to_csv(key, index=None)

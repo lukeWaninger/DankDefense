@@ -24,7 +24,7 @@ log_message $"downloading base data"
 # aws s3 cp s3://dank-defense/data data --recursive
 
 log_message $"downloading pipeline scripts"
-aws s3 cp s3://dank-defense/scripts . --recursive
+pip3 install git+https://github.com/lukeWaninger/DankDefense
 
 log_message $"installing Python requirements"
 

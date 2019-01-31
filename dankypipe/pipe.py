@@ -341,6 +341,9 @@ class Ec2Job(object):
             if self.instance is not None else "no instance attached"
         return f'Ec2Job <({self.config["job_name"]}, {ins})>'
 
+    def __del__(self):
+        self.terminate_instance()
+
     def __prepare_init(self):
         """builds an initialization shell script for the EC2 instance
 
@@ -431,63 +434,71 @@ class Ec2Job(object):
         Returns:
 
         """
-        if self.job_name not in get_jobs_listing(**kwargs):
-            raise ValueError(f'Job <{self.job_name}> not prepared')
+        if self.instance is not None:
+            self.instance.load()
 
-        iargs = dict(
-            ImageId=const.AMI,
-            InstanceType=self.instance_type,
-            SecurityGroupIds=[self.security_group],
-            UserData=self.__prepare_init(),
-            DisableApiTermination=False,
-            EbsOptimized=True,
-            TagSpecifications=[
-                {
-                    'ResourceType': 'instance',
-                    'Tags': [
-                        {
-                            'Key': const.TAG_KEY,
-                            'Value': const.PROJECT_NAME
-                        },
-                    ]
-                },
-            ],
-            MaxCount=1,
-            MinCount=1,
-            Monitoring=dict(Enabled=False)
-        )
+            with ec2ssh(self.instance.public_dns_name, self.ssh_key_path, sftp=False) as svr:
+                cmd = f'python3 runner.py {self.job_name}'
+                svr.exec_command(cmd)
+        else:
+            if self.job_name not in get_jobs_listing(**kwargs):
+                raise ValueError(f'Job <{self.job_name}> not prepared')
 
-        # verify spot request
-        if is_spot:
-            iargs['InstanceMarketOptions'] = {
-                'MarketType': 'spot',
-                'SpotOptions': {
-                    'SpotInstanceType': 'one-time',
-                    'InstanceInterruptionBehavior': 'terminate'
+            iargs = dict(
+                ImageId=const.AMI,
+                InstanceType=self.instance_type,
+                SecurityGroupIds=[self.security_group],
+                UserData=self.__prepare_init(),
+                DisableApiTermination=False,
+                EbsOptimized=True,
+                TagSpecifications=[
+                    {
+                        'ResourceType': 'instance',
+                        'Tags': [
+                            {
+                                'Key': const.TAG_KEY,
+                                'Value': const.PROJECT_NAME
+                            },
+                        ]
+                    },
+                ],
+                MaxCount=1,
+                MinCount=1,
+                Monitoring=dict(Enabled=False)
+            )
+
+            # verify spot request
+            if is_spot:
+                iargs['InstanceMarketOptions'] = {
+                    'MarketType': 'spot',
+                    'SpotOptions': {
+                        'SpotInstanceType': 'one-time',
+                        'InstanceInterruptionBehavior': 'terminate'
+                    }
                 }
-            }
 
-        if self.ssh_key_name is not None:
-            iargs['KeyName'] = self.ssh_key_name
+            if self.ssh_key_name is not None:
+                iargs['KeyName'] = self.ssh_key_name
 
-        print(f'initializing EC2 instance')
-        start = time.time()
+            print(f'initializing EC2 instance')
+            start = time.time()
 
-        self.instance = self._resource.create_instances(**iargs)[0]
-        self.iid = self.instance.instance_id
+            self.instance = self._resource.create_instances(**iargs)[0]
+            self.iid = self.instance.instance_id
 
-        self.instance.wait_until_running()
-        self.instance.load()
+            self.instance.wait_until_running()
+
+            # wait for instance to run init.sh
+            time.sleep(45)
+            self.instance.load()
 
         try:
-            time.sleep(30)
             self.monitor()
 
             results = get_results(self.job_name, include_predictions=True, kwargs=kwargs)
             results['instance_id'] = self.iid
             results['run_time'] = pd.Timedelta(seconds=(time.time()-start))
 
-            self.terminate_instance()
             return results
         except Exception as e:
             results = dict(
@@ -499,7 +510,7 @@ class Ec2Job(object):
 
     def monitor(self):
         print(f'establishing connection with {self.instance.public_dns_name}')
-        with ec2sftp(self.instance.public_dns_name, self.ssh_key_path) as svr:
+        with ec2ssh(self.instance.public_dns_name, self.ssh_key_path) as svr:
             finished, i = False, 0
             log_file, log = f'{self.job_name}_log.txt', []
 
@@ -542,6 +553,11 @@ class Ec2Job(object):
             print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
             print(e.args)
             print()
+
+    def reset_config(self, config):
+        self.config = config
+        self.job_name = config['job_name']
+        return self
 
 
 def get_results(job_name, include_predictions=False, **kwargs):
@@ -646,7 +662,7 @@ def set_security_groups(client):
 
 
 @contextmanager
-def ec2sftp(public_dns, ssh_key_path):
+def ec2ssh(public_dns, ssh_key_path, sftp=True):
     server = paramiko.SSHClient()
     server.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     connected, attempts = False, 0
@@ -662,7 +678,10 @@ def ec2sftp(public_dns, ssh_key_path):
             )
             connected = True
 
-            server = server.open_sftp()
+            if sftp:
+                server = server.open_sftp()
+            else:
+                pass
 
             yield server
             server.close()

@@ -104,11 +104,6 @@ def upload_feature(feature_name, datasets, overwrite=False, **kwargs):
 
         etags[dataset] = response['ETag'].replace('"', '')
 
-        if os.path.exists('tmp'):
-            for tmp_file in os.listdir('tmp'):
-                os.remove(tmp_file)
-        else:
-            pass
     return etags
 
 

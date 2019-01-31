@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="danky-pipe",
+    name="dankypipe",
     version="0.0.1",
     author="Vivek Pagadala, Luke Waninger",
     author_email="luke.waninger@gmail.com",

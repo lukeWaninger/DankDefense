@@ -143,19 +143,28 @@ def download_feature(feature_name, **kwargs):
 
     result = {}
     for dataset in const.DATASET_KEYS:
-        key = f'{configure_prefix(const.FEATURES_KEY, kwargs)}/{feature_name}_{dataset}.csv'
+        prefix = configure_prefix(const.FEATURES_KEY, kwargs)
 
-        obj = client.get_object(
-            Bucket=const.BUCKET,
-            Key=key,
-        )
-        if obj['ContentLength'] > 10:
-            bio = BytesIO(obj['Body'].read())
+        if not os.path.exists(prefix):
+            os.mkdir(prefix)
 
-            result[dataset] = pd.read_csv(bio)
+        key = f'{prefix}/{feature_name}_{dataset}.csv'
+        if os.path.exists(key):
+            result[dataset] = pd.read_csv(key)
 
-            bio.close()
-            del bio
+        else:
+            obj = client.get_object(
+                Bucket=const.BUCKET,
+                Key=key,
+            )
+            if obj['ContentLength'] > 10:
+                bio = BytesIO(obj['Body'].read())
+
+                result[dataset] = pd.read_csv(bio)
+                result[dataset].to_csv(key, index=None)
+
+                bio.close()
+                del bio
 
     return result
 

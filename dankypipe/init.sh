@@ -20,8 +20,8 @@ cd /home/ubuntu
 
 log_message $"starting job"
 log_message $"downloading base data"
-mkdir data
-aws s3 cp s3://dank-defense/data data --recursive
+# mkdir data
+# aws s3 cp s3://dank-defense/data data --recursive
 
 log_message $"downloading pipeline scripts"
 aws s3 cp s3://dank-defense/scripts . --recursive

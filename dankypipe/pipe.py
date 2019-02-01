@@ -48,7 +48,7 @@ def get_feature_names(**kwargs):
     return features
 
 
-def validate_name(feature_name, **kwargs):
+def validate_feature_name(feature_name, **kwargs):
     """check whether or not a feature name is valid
 
     Args:
@@ -72,7 +72,7 @@ def upload_feature(feature_name, datasets, overwrite=False, **kwargs):
     Returns:
         dict containing ETags of uploaded items by dataset
     """
-    if not validate_name(feature_name, **kwargs) and not overwrite:
+    if not validate_feature_name(feature_name, **kwargs) and not overwrite:
         raise ValueError(f'Feature name <{feature_name}> already in use')
 
     if any([not os.path.exists(p) for p in datasets if isinstance(p, str)]):
@@ -138,7 +138,7 @@ def download_feature(feature_name, cache=False, **kwargs):
     Returns:
         pd.DataFrame
     """
-    if validate_name(feature_name, **kwargs):
+    if validate_feature_name(feature_name, **kwargs):
         raise ValueError(f'Feature <{feature_name}> does not exist')
 
     client = boto3.client('s3')
@@ -333,14 +333,15 @@ class Ec2Job(object):
 
         self.security_group = set_security_groups(self._client)
 
-        try:
-            self.prepare_job(overwrite, **kwargs)
-        except ValueError as e:
-            if 'already in use' in e.args:
-                print(e.args)
-                print('Run prepare_jobs again with overwrite to overwrite the existing job')
-            else:
-                raise e
+        if self.validate_config():
+            try:
+                self.prepare_job(overwrite, **kwargs)
+            except ValueError as e:
+                if 'already in use' in e.args:
+                    print(e.args)
+                    print('Run prepare_jobs again with overwrite to overwrite the existing job')
+                else:
+                    raise e
 
     def __repr__(self):
         ins = f'{self.instance.instance_id} is {self.instance.state["Name"]}' \
@@ -564,6 +565,23 @@ class Ec2Job(object):
         self.config = config
         self.job_name = config['job_name']
         return self
+
+    def validate_config(self):
+        valid = True
+
+        if not os.path.exists(self.ssh_key_path):
+            print('warning: path to ssh key does not exist')
+            valid = False
+
+        for f in self.config['features']:
+            if validate_feature_name(f):
+                print(f'feature {f} not found in feature list')
+                valid = False
+
+        if not valid:
+            self.config = None
+
+        return valid
 
 
 def get_results(job_name, include_predictions=False, **kwargs):

@@ -297,11 +297,13 @@ class Ec2Job(object):
                  instance_type=None,
                  ssh_key_name=None,
                  ssh_key_path=None,
+                 is_spot=False,
                  **kwargs):
         self.config = config
         self.job_name = config['job_name']
         self.instance = None
         self.iid = None
+        self.is_spot = is_spot
 
         # get the aws_region
         if aws_region is None and 'AWS_DEFAULT_REGION' in const.SECRETS.keys():
@@ -431,21 +433,20 @@ class Ec2Job(object):
 
         return config
 
-    def run_job(self, is_spot=True, **kwargs):
+    def run(self, **kwargs):
         """
 
         Args:
-            is_spot: (bool) - set to True to initialize as a spot request
             kwargs:
 
         Returns:
-
+            dict
         """
         if self.instance is not None:
             self.instance.load()
 
             with ec2ssh(self.instance.public_dns_name, self.ssh_key_path, sftp=False) as svr:
-                cmd = f'python3 runner.py {self.job_name}'
+                cmd = f'python3 runner.py {self.job_name} &>> {self.job_name}_log.txt'
                 svr.exec_command(cmd)
         else:
             if self.job_name not in get_jobs_listing(**kwargs):
@@ -475,7 +476,7 @@ class Ec2Job(object):
             )
 
             # verify spot request
-            if is_spot:
+            if self.is_spot:
                 iargs['InstanceMarketOptions'] = {
                     'MarketType': 'spot',
                     'SpotOptions': {

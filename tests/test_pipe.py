@@ -2,7 +2,7 @@ from unittest import skip, TestCase
 
 import pandas as pd
 
-import scripts.pipe as pipe
+import dankypipe.pipe as pipe
 
 
 class TestPipe(TestCase):

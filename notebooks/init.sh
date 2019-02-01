@@ -8,25 +8,30 @@ export JOB="!job_name!"
 
 export LOGFILE=$JOB\_log.txt
 
-apt-get -y install python3-pip
-pip3 install awscli
-
 log_message()
 {
     echo "`date`: " $1 &>> $LOGFILE
 }
+log_message $"starting job"
 
 cd /home/ubuntu
 
-log_message $"starting job"
-log_message $"downloading base data"
-# mkdir data
-# aws s3 cp s3://dank-defense/data data --recursive
+log_message $"installing python3-pip"
+apt-get update
+apt-get -y install python3-pip
+
+log_message $"installing awcli"
+pip3 install awscli
 
 log_message $"installing the dank pipe"
-pip3 install git+https://github.com/lukeWaninger/DankDefense
+pip3 install git+https://github.com/lukeWaninger/DankDefense &>> $LOGFILE
+
+log message $"installing requirements"
+wget https://raw.githubusercontent.com/lukeWaninger/DankDefense/master/dankypipe/requirements.txt
+pip3 install -r requirements.txt &>> $LOGFILE
 
 log_message $"executing runner"
+wget https://raw.githubusercontent.com/lukeWaninger/DankDefense/master/dankypipe/runner.py
 python3 runner.py $JOB &>> $LOGFILE
 
 log_message $"uploading logs"

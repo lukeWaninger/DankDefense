@@ -20,15 +20,11 @@ cd /home/ubuntu
 
 log_message $"starting job"
 log_message $"downloading base data"
-mkdir data
-aws s3 cp s3://dank-defense/data data --recursive
+# mkdir data
+# aws s3 cp s3://dank-defense/data data --recursive
 
-log_message $"downloading pipeline scripts"
-aws s3 cp s3://dank-defense/scripts . --recursive
-
-log_message $"installing Python requirements"
-
-pip3 install -r requirements.txt &>> $LOGFILE
+log_message $"installing the dank pipe"
+pip3 install git+https://github.com/lukeWaninger/DankDefense
 
 log_message $"executing runner"
 python3 runner.py $JOB &>> $LOGFILE

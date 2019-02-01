@@ -160,13 +160,18 @@ def download_feature(feature_name, cache=False, **kwargs):
                 Key=key,
             )
             if obj['ContentLength'] > 10:
-                result[dataset] = pd.read_pickle(obj['Body'].read())
+                bio = BytesIO(obj['Body'].read())
+                bio.seek(0)
+
+                result[dataset] = pd.read_pickle(bio, compression='gzip')
 
                 if cache:
-                    result[dataset].to_csv(key, index=None)
+                    result[dataset].to_pickle(key)
                 else:
                     pass
 
+                bio.close()
+                del bio
     return result
 
 

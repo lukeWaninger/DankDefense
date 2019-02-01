@@ -305,9 +305,10 @@ class Ec2Job(object):
         self.instance = None
         self.iid = None
 
-        self.ami = ami
-        if ami is None and 'AWS_AMI' in const.SECRETS.keys():
-            self.ami = const.SECRETS['AWS_AMI']
+        if ami is not None:
+            self.ami = ami
+        elif 'AWS_DEFAULT_AMI' in const.SECRETS.keys():
+            self.ami = const.SECRETS['AWS_DEFAULT_AMI']
         else:
             self.ami = const.AWS_DEFAULT_AMI
 

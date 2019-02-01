@@ -39,7 +39,7 @@ def get_feature_names(**kwargs):
         prefix = configure_prefix(const.FEATURES_KEY, kwargs)
 
         features = list({
-            re.sub(r'(/|.csv|_' + '|_'.join(const.DATASET_KEYS) + '|' + prefix + ')+', '', c['Key'])
+            re.sub(r'(/|.pickle|_' + '|_'.join(const.DATASET_KEYS) + '|' + prefix + ')+', '', c['Key'])
             for c in contents[1:]
     })
     else:
@@ -194,17 +194,17 @@ def build_feature_set(feature_names, max_concurrent_conn=-1, **kwargs):
         else:
             return download_feature(*args)
 
-    pool = TPool(max_conn)
-    result = list(pool.map(
-        download_wrapper,
-        [(feature, kwargs) for feature in feature_names]
-    ))
-
     def recursive_join(frames):
         if len(frames) == 1:
             return frames[0]
 
         return frames[0].merge(recursive_join(frames[1:]), on='MachineIdentifier', how='outer')
+
+    pool = TPool(max_conn)
+    result = list(pool.map(
+        download_wrapper,
+        [(feature, kwargs) for feature in feature_names]
+    ))
 
     target = download_feature('Target')
 

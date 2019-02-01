@@ -295,6 +295,7 @@ class Ec2Job(object):
                  overwrite=False,
                  aws_region=None,
                  instance_type=None,
+                 ami=None,
                  ssh_key_name=None,
                  ssh_key_path=None,
                  is_spot=False,
@@ -303,6 +304,13 @@ class Ec2Job(object):
         self.job_name = config['job_name']
         self.instance = None
         self.iid = None
+
+        self.ami = ami
+        if ami is None and 'AWS_AMI' in const.SECRETS.keys():
+            self.ami = const.SECRETS['AWS_AMI']
+        else:
+            self.ami = const.AWS_DEFAULT_AMI
+
         self.is_spot = is_spot
 
         # get the aws_region
@@ -453,7 +461,7 @@ class Ec2Job(object):
                 raise ValueError(f'Job <{self.job_name}> not prepared')
 
             iargs = dict(
-                ImageId=const.AMI,
+                ImageId=self.ami,
                 InstanceType=self.instance_type,
                 SecurityGroupIds=[self.security_group],
                 UserData=self.__prepare_init(),

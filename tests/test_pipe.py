@@ -147,15 +147,15 @@ class TestPipe(TestCase):
         ]))
 
     def test_prepare_job(self):
+        ins = pipe.Ec2Job(config=self.config)
+
         self.assertRaises(
             ValueError,
-            pipe.prepare_job,
-            config=self.config,
-            overwrite=False,
+            ins.prepare_job,
             **self.kwargs
         )
 
-        result = pipe.prepare_job(
+        result = ins.prepare_job(
             self.config,
             overwrite=True,
             **self.kwargs

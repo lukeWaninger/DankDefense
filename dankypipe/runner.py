@@ -171,7 +171,7 @@ def tune_grid(config):
     tasks = list(candidate_updates)
     task_count = len(tasks)
     for i, c in enumerate(tasks):
-        log(job, f'fitting task {i} of {task_count}')
+        log(job, f'fitting task {i+1} of {task_count}')
 
         candidate_parameters = copy.deepcopy(parameters)
         for d in c:
@@ -235,7 +235,7 @@ def load_model(config):
 
 def log(job, message):
     with open(f'{job}_log.txt', 'w') as f:
-        f.write(f'{c.now()}: {message}')
+        f.write(f'{c.now()}: {message}\n')
 
 
 def main():

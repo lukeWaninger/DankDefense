@@ -1,3 +1,4 @@
+import datetime as dt
 import os
 from pathlib import Path
 import yaml
@@ -94,3 +95,7 @@ try:
             os.environ[secret] = SECRETS[secret]
 except FileNotFoundError:
     print('no secrets file found. resorting to environment variables')
+
+
+def now():
+    return dt.datetime.now().strftime('%a %b %d %H:%M%S %Z %Y')

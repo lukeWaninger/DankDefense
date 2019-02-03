@@ -3,13 +3,14 @@ The "train -> validate -> predict" pipeline.
 """
 
 import argparse
+import datetime as dt
 import pandas as pd
 import importlib
 import itertools
 import copy
 from sklearn.metrics import roc_auc_score, accuracy_score, confusion_matrix, classification_report
 
-from dankypipe import pipe
+from dankypipe import constants, pipe
 
 
 def fetch_data(job_name, **kwargs):
@@ -217,14 +218,15 @@ def load_model(config):
     Returns:
         Model
     """
-    model_path = 'models.' + config['model']['name']
-    model = importlib.import_module(model_path).Model
+    model_path = 'dankypipe.models.' + config['model']['name']
+    model = importlib.import_module(model_path)
 
-    with open(model_path) as f:
+    with open(model.__file__) as f:
         print(title('Model Source'))
         for line in f:
-            print(line)
-    return model
+            print(line.rstrip())
+
+    return model.Model
 
 
 def main():
@@ -232,7 +234,11 @@ def main():
     parser.add_argument('job', type=str, help='HELP!')
 
     job_name = parser.parse_args().job
+
+    print(f'{constants.now()}: building dataset')
     config = fetch_data(job_name)
+
+    print(f'{constants.now()}: building model')
     run_task(config)
 
 

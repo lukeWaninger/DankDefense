@@ -168,8 +168,9 @@ def tune_grid(config):
     ])
     results = []
 
-    task_count = len(list(candidate_updates))
-    for i, c in enumerate(candidate_updates):
+    tasks = list(candidate_updates)
+    task_count = len(tasks)
+    for i, c in enumerate(tasks):
         log(job, f'fitting task {i} of {task_count}')
 
         candidate_parameters = copy.deepcopy(parameters)

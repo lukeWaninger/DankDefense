@@ -169,19 +169,15 @@ def tune_grid(config):
 
     task_count = len(list(candidate_updates))
     for i, c in enumerate(candidate_updates):
-        log(f'fitting task {i} aof {task_count}')
-        # candidate_parameters = copy.deepcopy(parameters)
+        log(f'fitting task {i} of {task_count}')
 
-        superd = {}
+        candidate_parameters = copy.deepcopy(parameters)
         for d in c:
             for k, v in d.items():
-                superd[k] = v
+                candidate_parameters[k] = v
 
-        # for path, value in c.items():
-        #     _update_dict(candidate_parameters, path, value)
-
-        res = validate(config, superd)
-        results.append((superd, res))
+        res = validate(config, candidate_parameters)
+        results.append((candidate_parameters, res))
 
     metric = config['tuning']['metric']
     best_parameters = max(results, key=lambda x: x[1][metric])[0]

@@ -28,10 +28,7 @@ pip3 install git+https://github.com/lukeWaninger/DankDefense &>> $LOGFILE
 
 log message $"installing requirements"
 wget https://raw.githubusercontent.com/lukeWaninger/DankDefense/master/dankypipe/requirements.txt
-pip3 install -r requirements.txt &>> $LOGFILE
-
-log_message $"downloading models from s3"
-aws s3 cp s3://dank-defense/models . --recursive
+pip3 install -r requirements.txt
 
 log_message $"executing runner"
 wget https://raw.githubusercontent.com/lukeWaninger/DankDefense/master/dankypipe/runner.py

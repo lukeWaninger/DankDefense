@@ -374,7 +374,7 @@ class Ec2Job(object):
         """
         import dankypipe as pipe
         with open(pipe.__file__.replace('__init__.py', 'init.sh'), 'r') as f:
-            init = f.readlines()
+            init = f.read()
 
         init = init.replace(
             "!aws_access_key_id!", const.SECRETS['AWS_ACCESS_KEY_ID']
@@ -477,6 +477,10 @@ class Ec2Job(object):
                                 'Key': const.TAG_KEY,
                                 'Value': const.PROJECT_NAME
                             },
+                            {
+                                'Key': 'Name',
+                                'Value': self.job_name
+                            }
                         ]
                     },
                 ],
@@ -775,7 +779,10 @@ def upload_results(job_name, result_summary, predictions, **kwargs):
                 Body=f,
                 Bucket=const.BUCKET,
                 Key=key,
-                Tagging=const.TAG_KEY + "=" + const.PROJECT_NAME
+                Tagging=[
+                    f'Name={job_name}',
+                    const.TAG_KEY + "=" + const.PROJECT_NAME
+                ]
             )
         set_acl(client, key)
 

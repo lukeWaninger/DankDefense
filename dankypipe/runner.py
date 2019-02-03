@@ -160,6 +160,7 @@ def tune_grid(config):
     parameters = config['model']['parameters']
     updates = config['tuning']['parameters']
     job = config['job_name']
+    metric = config['tuning']['metric']
 
     candidate_updates = itertools.product(*[
         [
@@ -176,15 +177,16 @@ def tune_grid(config):
         log(job, f'fitting task {i+1} of {task_count}')
 
         candidate_parameters = copy.deepcopy(parameters)
+        candidate_parameters['metric'] = metric
         for d in c:
             for k, v in d.items():
                 candidate_parameters[k] = v
 
+        candidate_parameters = dict(params=candidate_parameters)
         res = validate(config, candidate_parameters)
         log(job, json.dumps(res))
         results.append((candidate_parameters, res))
 
-    metric = config['tuning']['metric']
     best_parameters = max(results, key=lambda x: x[1][metric])[0]
 
     log(job, 'tuning completed')

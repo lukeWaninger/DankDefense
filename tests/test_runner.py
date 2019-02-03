@@ -61,8 +61,9 @@ class TestJobRunner(TestCase):
 
     def test_runner(self):
         config = pipe.download_config('a_small_demo')
-        config['model']['name'] = 'lgbm'
-        model = runner.load_model(config)
+
+        runner.tune_grid(config)
+
 
         # runner.run_task(config)
 

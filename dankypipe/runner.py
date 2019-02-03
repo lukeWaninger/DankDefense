@@ -185,6 +185,7 @@ def tune_grid(config):
 
         candidate_parameters = dict(params=candidate_parameters)
         res = validate(config, candidate_parameters)
+
         log(job, json.dumps(res))
         results.append((candidate_parameters, res))
 
@@ -240,7 +241,8 @@ def load_model(config):
 
 
 def log(job, message):
-    print(f'{c.now()}:  {message}\n')
+    with open(f'{job}_log.txt', 'w') as f:
+        f.write(f'{c.now()}:  {message}\n')
 
 
 def main():

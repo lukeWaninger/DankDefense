@@ -3,12 +3,14 @@ The "train -> validate -> predict" pipeline.
 """
 
 import argparse
+import numpy as np
 import pandas as pd
 import importlib
 import json
 import itertools
 import copy
 from sklearn.metrics import roc_auc_score, accuracy_score, confusion_matrix, classification_report
+import time
 
 import dankypipe.constants as c
 from dankypipe import pipe
@@ -236,7 +238,7 @@ def load_model(config):
 
 def log(job, message):
     with open(f'{job}_log.txt', 'w') as f:
-        f.write(f'{c.now()}: {message}\n')
+        f.write(f'{c.now()}:  {message}\n')
 
 
 def main():
@@ -246,7 +248,12 @@ def main():
     job_name = parser.parse_args().job
 
     log(job_name, 'building dataset')
+
+    a = time.time()
     config = fetch_data(job_name)
+
+    a, n = np.round(time.time()-a, 2), len(config["features"])
+    log(job_name, f'downloaded {n} in {a} seconds ({np.round(a/n, 2)} feat/s)')
 
     log(job_name, 'building model')
     run_task(config)

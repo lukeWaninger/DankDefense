@@ -98,5 +98,4 @@ except FileNotFoundError:
 
 
 def now():
-    return dt.datetime.now().strftime('%a %b %d %H:%M%S %Z %Y')
-
+    return dt.datetime.utcnow().strftime('%a %b %d %H:%M:%S %Z %Y')

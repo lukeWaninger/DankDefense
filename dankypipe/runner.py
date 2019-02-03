@@ -156,15 +156,26 @@ def tune_grid(config):
     parameters = config['model']['parameters']
     updates = config['tuning']['parameters']
 
-    candidate_updates = itertools.product(*[[{k: v} for v in updates[k]] for k in updates])
+    candidate_updates = itertools.product(*[
+        [
+            {
+                updates[i]['name']: j
+            } for j in updates[i]['values']
+        ] for i, k in enumerate(updates)
+    ])
     results = []
     for c in candidate_updates:
         candidate_parameters = copy.deepcopy(parameters)
 
-        for path, value in c.items():
-            _update_dict(candidate_parameters, path, value)
+        superd = {}
+        for d in c:
+            for k, v in d.items():
+                superd[k] = v
 
-        res = validate(config, candidate_parameters)
+        # for path, value in c.items():
+        #     _update_dict(candidate_parameters, path, value)
+
+        res = validate(config, superd)
         results.append((parameters, res))
 
     metric = config['tuning']['metric']

@@ -117,14 +117,14 @@ def set_acl(client, key):
     Returns:
         None
     """
-    # acl = client.get_bucket_acl(Bucket=const.BUCKET)
-    # del acl['ResponseMetadata']
-    #
-    # client.put_object_acl(
-    #     Bucket=const.BUCKET,
-    #     Key=key,
-    #     AccessControlPolicy=acl
-    # )
+    acl = client.get_bucket_acl(Bucket=const.BUCKET)
+    del acl['ResponseMetadata']
+
+    client.put_object_acl(
+        Bucket=const.BUCKET,
+        Key=key,
+        AccessControlPolicy=acl
+    )
     return None
 
 

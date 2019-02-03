@@ -2,7 +2,8 @@ from unittest import skip, TestCase
 
 import pandas as pd
 
-import scripts.runner as runner
+import dankypipe.runner as runner
+import dankypipe.pipe as pipe
 
 
 class TestJobRunner(TestCase):
@@ -58,3 +59,37 @@ class TestJobRunner(TestCase):
         config = runner.fetch_data(self.config['job_name'], **self.kwargs)
         self.assertTrue(config is not None)
 
+    def test_runner(self):
+        # config = pipe.download_config('a_small_demo')
+        # runner.run_task(config)
+
+        job = pipe.Ec2Job(config={
+            'job_name': 'a_small_demo',
+            'features': [
+                'AvSigVersion', 'IsBeta'
+            ],
+            'model': {
+                'name': 'lightgbm',
+                'parameters': {
+                    'verbosity': 1
+                }
+            },
+            'task': 'tune',
+            'tuning': {
+                'search_type': 'grid',
+                'parameters': [
+                    {
+                        'name': 'max_depth',
+                        'values': [10, 20]
+                    },
+                    {
+                        'name': 'learning_rate',
+                        'values': [.1, .2, .3]
+                    }
+                ],
+                'metric': 'auc'
+            }
+        }, overwrite=True)
+
+        config = runner.fetch_data(job.config['job_name'])
+        runner.run_task(config)

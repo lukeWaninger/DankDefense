@@ -179,6 +179,7 @@ def tune_grid(config):
                 candidate_parameters[k] = v
 
         res = validate(config, candidate_parameters)
+        log(job, json.dumps(res))
         results.append((candidate_parameters, res))
 
     metric = config['tuning']['metric']

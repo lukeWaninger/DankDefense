@@ -2,6 +2,7 @@ import datetime as dt
 import os
 from pathlib import Path
 import yaml
+import pytz
 
 BUCKET = 'dank-defense'
 FEATURES_KEY = 'features'
@@ -98,4 +99,4 @@ except FileNotFoundError:
 
 
 def now():
-    return dt.datetime.utcnow().strftime('%a %b %d %H:%M:%S %Z %Y')
+    return dt.datetime.utcnow().replace(tzinfo=pytz.utc).strftime('%a %b %d %H:%M:%S %Z %Y').replace(" 0", "  ")

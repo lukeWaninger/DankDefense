@@ -34,7 +34,7 @@ def metrics(y, yhat):
 
 def validate(config, parameters):
     train = config['train']
-    val = config['validation']
+    val = config['validate']
 
     model = load_model(config)(parameters)
     model.train(**train)
@@ -165,7 +165,7 @@ def tune_grid(config):
     ])
     results = []
     for c in candidate_updates:
-        candidate_parameters = copy.deepcopy(parameters)
+        # candidate_parameters = copy.deepcopy(parameters)
 
         superd = {}
         for d in c:

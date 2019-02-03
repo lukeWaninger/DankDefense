@@ -117,14 +117,14 @@ def set_acl(client, key):
     Returns:
         None
     """
-    acl = client.get_bucket_acl(Bucket=const.BUCKET)
-    del acl['ResponseMetadata']
-
-    client.put_object_acl(
-        Bucket=const.BUCKET,
-        Key=key,
-        AccessControlPolicy=acl
-    )
+    # acl = client.get_bucket_acl(Bucket=const.BUCKET)
+    # del acl['ResponseMetadata']
+    #
+    # client.put_object_acl(
+    #     Bucket=const.BUCKET,
+    #     Key=key,
+    #     AccessControlPolicy=acl
+    # )
     return None
 
 
@@ -500,6 +500,8 @@ class Ec2Job(object):
 
             print(f'initializing EC2 instance')
             start = time.time()
+
+            assert all([v is not None for k, v in iargs.items()])
 
             self.instance = self._resource.create_instances(**iargs)[0]
             self.iid = self.instance.instance_id

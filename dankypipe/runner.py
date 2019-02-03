@@ -233,7 +233,7 @@ def load_model(config):
 
 
 def log(job, message):
-    with open(f'{job}_logs.txt', 'w') as f:
+    with open(f'{job}_log.txt', 'w') as f:
         f.write(f'{c.now()}: {message}')
 
 

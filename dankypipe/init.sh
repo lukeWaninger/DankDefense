@@ -24,7 +24,7 @@ log_message $"installing awcli"
 pip3 install awscli
 
 log_message $"installing the dank pipe"
-pip3 install git+https://github.com/lukeWaninger/DankDefense &>> $LOGFILE
+pip3 install git+https://github.com/lukeWaninger/DankDefense
 
 log message $"installing requirements"
 wget https://raw.githubusercontent.com/lukeWaninger/DankDefense/master/dankypipe/requirements.txt

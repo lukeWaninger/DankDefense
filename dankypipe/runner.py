@@ -8,6 +8,7 @@ import pandas as pd
 import importlib
 import json
 import itertools
+import sys
 import copy
 from sklearn.metrics import roc_auc_score, accuracy_score, confusion_matrix, classification_report
 import time
@@ -239,8 +240,7 @@ def load_model(config):
 
 
 def log(job, message):
-    with open(f'{job}_log.txt', 'w') as f:
-        f.write(f'{c.now()}:  {message}\n')
+    print(f'{c.now()}:  {message}\n')
 
 
 def main():
@@ -248,6 +248,9 @@ def main():
     parser.add_argument('job', type=str, help='HELP!')
 
     job_name = parser.parse_args().job
+
+    sys.stdout = open(f'{job_name}_log.txt', 'w')
+    sys.stderr = open(f'{job_name}_log.txt', 'w')
 
     log(job_name, 'building dataset')
 

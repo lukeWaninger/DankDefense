@@ -10,7 +10,7 @@ import itertools
 import copy
 from sklearn.metrics import roc_auc_score, accuracy_score, confusion_matrix, classification_report
 
-from dankypipe.constants import log
+import dankypipe.constants as c
 from dankypipe import pipe
 
 
@@ -157,6 +157,7 @@ def tune_grid(config):
     """
     parameters = config['model']['parameters']
     updates = config['tuning']['parameters']
+    job = config['job_name']
 
     candidate_updates = itertools.product(*[
         [
@@ -169,7 +170,7 @@ def tune_grid(config):
 
     task_count = len(list(candidate_updates))
     for i, c in enumerate(candidate_updates):
-        log(f'fitting task {i} of {task_count}')
+        log(job, f'fitting task {i} of {task_count}')
 
         candidate_parameters = copy.deepcopy(parameters)
         for d in c:
@@ -182,8 +183,8 @@ def tune_grid(config):
     metric = config['tuning']['metric']
     best_parameters = max(results, key=lambda x: x[1][metric])[0]
 
-    log('tuning completed')
-    log(json.dumps(best_parameters))
+    log(job, 'tuning completed')
+    log(job, json.dumps(best_parameters))
     return best_parameters, results
 
 
@@ -231,16 +232,21 @@ def load_model(config):
     return model.Model
 
 
+def log(job, message):
+    with open(f'{job}_logs.txt', 'w') as f:
+        f.write(f'{c.now()}: {message}')
+
+
 def main():
     parser = argparse.ArgumentParser(description='--')
     parser.add_argument('job', type=str, help='HELP!')
 
     job_name = parser.parse_args().job
 
-    log('building dataset')
+    log(job_name, 'building dataset')
     config = fetch_data(job_name)
 
-    log('building model')
+    log(job_name, 'building model')
     run_task(config)
 
 

@@ -251,9 +251,6 @@ def main():
 
     job_name = parser.parse_args().job
 
-    sys.stdout = open(f'{job_name}_log.txt', 'w')
-    sys.stderr = open(f'{job_name}_log.txt', 'w')
-
     log(job_name, 'building dataset')
 
     a = time.time()

@@ -99,3 +99,7 @@ except FileNotFoundError:
 
 def now():
     return dt.datetime.now().strftime('%a %b %d %H:%M%S %Z %Y')
+
+
+def log(message):
+    print(f'{now()}: {message}')

@@ -3,14 +3,15 @@ The "train -> validate -> predict" pipeline.
 """
 
 import argparse
-import datetime as dt
 import pandas as pd
 import importlib
+import json
 import itertools
 import copy
 from sklearn.metrics import roc_auc_score, accuracy_score, confusion_matrix, classification_report
 
-from dankypipe import constants, pipe
+from dankypipe.constants import log
+from dankypipe import pipe
 
 
 def fetch_data(job_name, **kwargs):
@@ -165,7 +166,10 @@ def tune_grid(config):
         ] for i, k in enumerate(updates)
     ])
     results = []
-    for c in candidate_updates:
+
+    task_count = len(list(candidate_updates))
+    for i, c in enumerate(candidate_updates):
+        log(f'fitting task {i} aof {task_count}')
         # candidate_parameters = copy.deepcopy(parameters)
 
         superd = {}
@@ -182,6 +186,8 @@ def tune_grid(config):
     metric = config['tuning']['metric']
     best_parameters = max(results, key=lambda x: x[1][metric])[0]
 
+    log('tuning completed')
+    log(json.dumps(best_parameters))
     return best_parameters, results
 
 
@@ -235,10 +241,10 @@ def main():
 
     job_name = parser.parse_args().job
 
-    print(f'{constants.now()}: building dataset')
+    log('building dataset')
     config = fetch_data(job_name)
 
-    print(f'{constants.now()}: building model')
+    log('building model')
     run_task(config)
 
 

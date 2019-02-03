@@ -94,6 +94,7 @@ try:
 
         for secret in SECRETS:
             os.environ[secret] = SECRETS[secret]
+
 except FileNotFoundError:
     print('no secrets file found. resorting to environment variables')
 

@@ -179,7 +179,8 @@ class TestPipe(TestCase):
         self.assertTrue(result == self.config)
 
     def test_prep_init(self):
-        result = pipe.prepare_init('test_job_1', **self.kwargs)
+        job = pipe.Ec2Job(config=self.config, kwargs=self.kwargs)
+        result = job.prepare_init()
         self.assertTrue(all([
             c not in result for c in [
                 '"!', '!#'

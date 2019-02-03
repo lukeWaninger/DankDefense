@@ -363,7 +363,7 @@ class Ec2Job(object):
     def __del__(self):
         self.terminate_instance()
 
-    def __prepare_init(self):
+    def prepare_init(self):
         """builds an initialization shell script for the EC2 instance
 
         Args:
@@ -372,9 +372,9 @@ class Ec2Job(object):
         Returns:
             str
         """
-        p = 'init.sh'
-        with open(p, 'r') as f:
-            init = f.read()
+        import dankypipe as pipe
+        with open(pipe.__file__.replace('__init__.py', 'init.sh'), 'r') as f:
+            init = f.readlines()
 
         init = init.replace(
             "!aws_access_key_id!", const.SECRETS['AWS_ACCESS_KEY_ID']
@@ -466,7 +466,7 @@ class Ec2Job(object):
                 ImageId=self.ami,
                 InstanceType=self.instance_type,
                 SecurityGroupIds=[self.security_group],
-                UserData=self.__prepare_init(),
+                UserData=self.prepare_init(),
                 DisableApiTermination=False,
                 EbsOptimized=True,
                 TagSpecifications=[
@@ -756,7 +756,10 @@ def upload_results(job_name, result_summary, predictions, **kwargs):
                 Body=f,
                 Bucket=const.BUCKET,
                 Key=key,
-                Tagging=const.TAG_KEY + "=" + const.PROJECT_NAME
+                Tagging=[
+                    f'Name={job_name}',
+                    const.TAG_KEY + "=" + const.PROJECT_NAME
+                ]
             )
         set_acl(client, key)
 

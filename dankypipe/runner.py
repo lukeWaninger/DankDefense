@@ -181,7 +181,7 @@ def tune_grid(config):
         #     _update_dict(candidate_parameters, path, value)
 
         res = validate(config, superd)
-        results.append((parameters, res))
+        results.append((superd, res))
 
     metric = config['tuning']['metric']
     best_parameters = max(results, key=lambda x: x[1][metric])[0]

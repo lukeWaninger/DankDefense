@@ -107,7 +107,7 @@ def upload_feature(feature_name, datasets, overwrite=False, **kwargs):
     return etags
 
 
-def set_acl(client, key):
+def set_acl(key):
     """set access control policy on S3 object
 
     Args:
@@ -125,7 +125,8 @@ def set_acl(client, key):
     #     Key=key,
     #     AccessControlPolicy=acl
     # )
-    acl = client.ObjectAcl(const.BUCKET, key)
+    # res = boto3.resource('s3')
+    # acl = res.ObjectAcl(const.BUCKET, key)
 
     return None
 

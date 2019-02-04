@@ -237,7 +237,7 @@ def load_model(config):
     model_path = 'dankypipe.models.' + config['model']['name']
     model = importlib.import_module(model_path)
 
-    model_str = ""
+    model_str = "\n"
     with open(model.__file__) as f:
         model_str += title('Model Source') + '\n'
 
@@ -247,7 +247,7 @@ def load_model(config):
             else:
                 model_str += line.rstrip() + '\n'
 
-    model_str += '\n------------end model\n\n'
+    model_str += '\n\n------------end model\n\n'
     log(config['job_name'], model_str)
 
     return model.Model

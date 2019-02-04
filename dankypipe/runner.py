@@ -168,6 +168,7 @@ def tune_grid(config):
     parameters = config['model']['parameters']
     updates = config['tuning']['parameters']
     metric = config['tuning']['metric']
+    job = config['job_name']
 
     candidate_updates = itertools.product(*[
         [
@@ -181,7 +182,7 @@ def tune_grid(config):
     tasks = list(candidate_updates)
     task_count = len(tasks)
     for i, c in enumerate(tasks):
-        log(f'fitting task {i+1} of {task_count}')
+        log(job, f'fitting task {i+1} of {task_count}')
 
         candidate_parameters = copy.deepcopy(parameters)
         candidate_parameters['metric'] = metric
@@ -192,13 +193,13 @@ def tune_grid(config):
         candidate_parameters = dict(params=candidate_parameters)
         res = validate(config, candidate_parameters)
 
-        log(json.dumps(res))
+        log(job, json.dumps(res))
         results.append((candidate_parameters, res))
 
     best_parameters = max(results, key=lambda x: x[1][metric])[0]
 
-    log('tuning completed')
-    log(json.dumps(best_parameters))
+    log(job, 'tuning completed')
+    log(job, json.dumps(best_parameters))
     return best_parameters, results
 
 
@@ -238,16 +239,19 @@ def load_model(config):
     model_path = 'dankypipe.models.' + config['model']['name']
     model = importlib.import_module(model_path)
 
+    model_str = ""
     with open(model.__file__) as f:
-        print(title('Model Source'))
+        model_str += title('Model Source') + '\n'
+
         for line in f:
             if len(line) == 1:
-                print()
+                model_str += '\n'
             else:
-                print(line.rstrip())
+                model_str += line.rstrip() + '\n'
 
-    print('------------end model')
-    print()
+    model_str += '------------end model\n\n'
+    log(config['job_name'], model)
+
     return model.Model
 
 
@@ -275,7 +279,7 @@ def main():
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        log(job, f'error: {e}\ntype: {exc_type}\nfile: {fname}\nline number: {exc_tb.tb_lineno}')
+        log(job, f'EXCEPTION\n  error: {e}\n  type: {exc_type}\n  file: {fname}\n  line number: {exc_tb.tb_lineno}')
 
 
 if __name__ == '__main__':

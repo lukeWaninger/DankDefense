@@ -100,4 +100,4 @@ except FileNotFoundError:
 
 
 def now():
-    return dt.datetime.utcnow().replace(tzinfo=pytz.utc).strftime('%a %b %d %H:%M:%S %Z %Y').replace(" 0", "  ")
+    return dt.datetime.utcnow().replace(tzinfo=pytz.utc).strftime('%a %b %d %H:%M:%S %Z %Y').replace("  0", "   ")

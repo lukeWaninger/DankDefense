@@ -38,11 +38,11 @@ def metrics(y, yhat):
     )
 
 
-def validate(config, parameters):
+def validate(config, parameters, kwargs):
     train = config['train']
     val = config['validate']
 
-    model = load_model(config)(parameters)
+    model = load_model(config)(parameters, kwargs)
     model.train(**train)
     yhat = model.predict(val['x'])
 
@@ -71,18 +71,20 @@ def run_task(config):
     """
     task = config['task']
     job = config['job_name']
+    params = config['model']['parameters']
+    kwargs = config['model']['kwargs']
 
     if task == 'validate':
-        results = validate(config, config['model']['parameters'])
+        results = validate(config, params, kwargs)
         pipe.upload_results(job, str(results), None)
 
     elif task == 'predict':
-        predictions = predict(config, config['model']['parameters'])
+        predictions = predict(config, params)
         pipe.upload_results(job, None, predictions)
 
     elif task == 'validate_predict':
-        results = validate(config, config['model']['parameters'])
-        predictions = predict(config, config['model']['parameters'])
+        results = validate(config, params, kwargs)
+        predictions = predict(config, params)
         pipe.upload_results(job, str(results), predictions)
 
     elif task == 'tune' or task == 'tune_predict':
@@ -132,6 +134,7 @@ def tune_stage_wise(config):
     parameters = copy.deepcopy(config['model']['parameters'])
     updates = config['tuning']['parameters']
     metric = config['tuning']['metric']
+    kwargs = config['model']['kwargs']
 
     # initialize all params to the first value in their list
     for path, values in updates.items():
@@ -143,7 +146,7 @@ def tune_stage_wise(config):
         results = []
         for value in values:
             _update_dict(candidate_parameters, path, value)
-            res = validate(config, candidate_parameters)
+            res = validate(config, candidate_parameters, kwargs)
             results.append((candidate_parameters, res))
 
         parameters = max(results, key=lambda x: x[1][metric])[0]
@@ -160,6 +163,7 @@ def tune_grid(config):
         (best_params, [(params, metrics)])
     """
     parameters = config['model']['parameters']
+    kwargs = config['model']['kwargs']
     updates = config['tuning']['parameters']
     metric = config['tuning']['metric']
     job = config['job_name']
@@ -185,15 +189,15 @@ def tune_grid(config):
                 candidate_parameters[k] = v
 
         candidate_parameters = dict(params=candidate_parameters)
-        res = validate(config, candidate_parameters)
+        res = validate(config, candidate_parameters, kwargs)
 
-        log(job, json.dumps(res))
+        log(job, res)
         results.append((candidate_parameters, res))
 
     best_parameters = max(results, key=lambda x: x[1][metric])[0]
 
     log(job, 'tuning completed')
-    log(job, json.dumps(best_parameters))
+    log(job, best_parameters)
     return best_parameters, results
 
 
@@ -250,6 +254,11 @@ def load_model(config):
 
 
 def log(job, message):
+    if isinstance(message, dict):
+        message = json.dumps(message)
+    elif not isinstance(message, str):
+        message = str(message)
+
     with open(f'{job}_log.txt', 'w') as f:
         f.write(f'{c.now()}:  {message}\n')
 

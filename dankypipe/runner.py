@@ -262,6 +262,9 @@ def log(job, message):
     with open(f'{job}_log.txt', 'w') as f:
         f.write(f'{c.now()}:  {message}\n')
 
+    f.close()
+    del f
+
 
 def main():
     parser = argparse.ArgumentParser(description='--')

@@ -125,6 +125,8 @@ def set_acl(client, key):
     #     Key=key,
     #     AccessControlPolicy=acl
     # )
+    acl = client.ObjectAcl(const.BUCKET, key)
+
     return None
 
 

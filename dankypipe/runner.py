@@ -234,8 +234,13 @@ def load_model(config):
     with open(model.__file__) as f:
         print(title('Model Source'))
         for line in f:
-            print(line.rstrip())
+            if len(line) == 1:
+                print(line)
+            else:
+                print(line.rstrip())
 
+    print('------------end model')
+    print()
     return model.Model
 
 

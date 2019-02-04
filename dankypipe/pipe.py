@@ -425,7 +425,7 @@ class Ec2Job(object):
                 Key=key,
                 Tagging=const.TAG_KEY + "=" + const.PROJECT_NAME
             )
-        set_acl(client, key)
+        set_acl(key)
 
         config = json.loads(config)
         config['submit_time'] = dt.datetime.now().isoformat()
@@ -455,6 +455,8 @@ class Ec2Job(object):
         Returns:
             dict
         """
+        start = time.time()
+
         if self.instance is not None:
             self.instance.load()
 
@@ -506,7 +508,6 @@ class Ec2Job(object):
                 iargs['KeyName'] = self.ssh_key_name
 
             print(f'initializing EC2 instance')
-            start = time.time()
 
             assert all([v is not None for k, v in iargs.items()])
 
@@ -768,7 +769,7 @@ def upload_results(job_name, result_summary, predictions, **kwargs):
                     const.TAG_KEY + "=" + const.PROJECT_NAME
                 ]
             )
-        set_acl(client, key)
+        set_acl(key)
 
     # upload the predicted values
     if predictions is not None:
@@ -787,7 +788,7 @@ def upload_results(job_name, result_summary, predictions, **kwargs):
                     const.TAG_KEY + "=" + const.PROJECT_NAME
                 ]
             )
-        set_acl(client, key)
+        set_acl(key)
 
 
 def configure_prefix(key, kwargs):

@@ -120,7 +120,7 @@ def set_acl(key):
     res = boto3.resource('s3')
     obj = res.ObjectAcl(const.PROJECT_NAME, key)
 
-    acl = json.loads(const.SECRETS['AWS_ACL'])
+    acl = json.loads(const.SECRETS['AWS_ACL'].replace("'", '"'))
     result = obj.put(ACL='private', AccessControlPolicy=acl)
 
     return result

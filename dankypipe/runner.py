@@ -271,21 +271,15 @@ def main():
     parser.add_argument('job', type=str, help='HELP!')
     job = parser.parse_args().job
 
-    try:
-        log(job, 'building dataset')
+    a = time.time()
+    log(job, 'building dataset')
+    config = fetch_data(job)
 
-        a = time.time()
-        config = fetch_data(job)
+    a, n = np.round(time.time()-a, 2), len(config["features"])
+    log(job, f'downloaded {n} in {a} seconds ({np.round(a/n, 2)} feat/s)')
 
-        a, n = np.round(time.time()-a, 2), len(config["features"])
-        log(job, f'downloaded {n} in {a} seconds ({np.round(a/n, 2)} feat/s)')
-
-        log(job, 'building model')
-        run_task(config)
-    except Exception as e:
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        log(job, f'EXCEPTION\n  error: {e}\n  type: {exc_type}\n  file: {fname}\n  line: {exc_tb.tb_lineno}')
+    log(job, 'building model')
+    run_task(config)
 
 
 if __name__ == '__main__':

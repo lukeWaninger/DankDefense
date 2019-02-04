@@ -12,8 +12,6 @@ class Model:
             self.kwargs = self.parameters['params']['kwargs']
             del self.parameters['params']['kwargs']
 
-        assert 'kwargs' not in self.parameters.keys()
-
     def train(self, x, y):
         lgb_train = lgb.Dataset(x, y)
         self.model = lgb.train(self.parameters['params'], lgb_train, **self.kwargs)

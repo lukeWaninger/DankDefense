@@ -42,15 +42,7 @@ def validate(config, parameters):
     train = config['train']
     val = config['validate']
 
-    if 'kwargs' in parameters.keys():
-        kwargs = parameters['kwargs']
-        del parameters['kwargs']
-    else:
-        kwargs = {}
-
-    assert 'kwargs' not in parameters.keys()
-
-    model = load_model(config)(parameters, **kwargs)
+    model = load_model(config)(parameters)
     model.train(**train)
     yhat = model.predict(val['x'])
 

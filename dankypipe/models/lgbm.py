@@ -6,11 +6,13 @@ class Model:
         self.parameters = parameters
         self.model = None
 
-        if 'kwargs' not in self.parameters.keys():
+        if 'kwargs' not in self.parameters['params'].keys():
             self.kwargs = {}
         else:
-            self.kwargs = self.parameters['kwargs']
-            del self.parameters['kwargs']
+            self.kwargs = self.parameters['params']['kwargs']
+            del self.parameters['params']['kwargs']
+
+        assert 'kwargs' not in self.parameters.keys()
 
     def train(self, x, y):
         lgb_train = lgb.Dataset(x, y)

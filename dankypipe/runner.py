@@ -39,14 +39,16 @@ def metrics(y, yhat):
 
 
 def validate(config, parameters):
-    train = {'x':None, 'y':None} # config['train']
-    val = {'x':None, 'y':None} # config['validate']
+    train = config['train']
+    val = config['validate']
 
     if 'kwargs' in parameters.keys():
         kwargs = parameters['kwargs']
         del parameters['kwargs']
     else:
         kwargs = {}
+
+    assert 'kwargs' not in parameters.keys()
 
     model = load_model(config)(parameters, **kwargs)
     model.train(**train)
@@ -249,8 +251,8 @@ def load_model(config):
             else:
                 model_str += line.rstrip() + '\n'
 
-    model_str += '------------end model\n\n'
-    log(config['job_name'], model)
+    model_str += '\n------------end model\n\n'
+    log(config['job_name'], model_str)
 
     return model.Model
 
@@ -279,7 +281,7 @@ def main():
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        log(job, f'EXCEPTION\n  error: {e}\n  type: {exc_type}\n  file: {fname}\n  line number: {exc_tb.tb_lineno}')
+        log(job, f'EXCEPTION\n  error: {e}\n  type: {exc_type}\n  file: {fname}\n  line: {exc_tb.tb_lineno}')
 
 
 if __name__ == '__main__':

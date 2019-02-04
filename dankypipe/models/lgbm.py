@@ -2,15 +2,10 @@ import lightgbm as lgb
 
 
 class Model:
-    def __init__(self, parameters):
+    def __init__(self, parameters, kwargs=None):
         self.parameters = parameters
         self.model = None
-
-        if 'kwargs' not in self.parameters['params'].keys():
-            self.kwargs = {}
-        else:
-            self.kwargs = self.parameters['params']['kwargs']
-            del self.parameters['params']['kwargs']
+        self.kwargs = kwargs if kwargs is not None else {}
 
     def train(self, x, y):
         lgb_train = lgb.Dataset(x, y)

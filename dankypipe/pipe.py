@@ -121,7 +121,7 @@ def set_acl(key):
     obj = res.ObjectAcl(const.BUCKET, key)
 
     acl = json.loads(const.SECRETS['AWS_ACL'].replace("'", '"'))
-    result = obj.put(ACL='private', AccessControlPolicy=acl)
+    result = obj.put(AccessControlPolicy=acl)
 
     return result
 

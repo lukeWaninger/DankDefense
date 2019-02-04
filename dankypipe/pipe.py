@@ -111,7 +111,6 @@ def set_acl(key):
     """set access control policy on S3 object
 
     Args:
-        client: (boto3.Client) the active S3 client
         key: (str)
 
     Returns:

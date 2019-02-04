@@ -72,7 +72,7 @@ def run_task(config):
     task = config['task']
     job = config['job_name']
     params = config['model']['parameters']
-    kwargs = config['model']['kwargs']
+    kwargs = config['model']['kwargs'] if 'kwargs' in config['model'].keys() else {}
 
     if task == 'validate':
         results = validate(config, params, kwargs)

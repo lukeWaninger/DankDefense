@@ -134,7 +134,7 @@ def tune_stage_wise(config):
     parameters = copy.deepcopy(config['model']['parameters'])
     updates = config['tuning']['parameters']
     metric = config['tuning']['metric']
-    kwargs = config['model']['kwargs']
+    kwargs = config['model']['kwargs'] if 'kwargs' in config['model'].keys() else {}
 
     # initialize all params to the first value in their list
     for path, values in updates.items():
@@ -163,7 +163,7 @@ def tune_grid(config):
         (best_params, [(params, metrics)])
     """
     parameters = config['model']['parameters']
-    kwargs = config['model']['kwargs']
+    kwargs = config['model']['kwargs'] if 'kwargs' in config['model'].keys() else {}
     updates = config['tuning']['parameters']
     metric = config['tuning']['metric']
     job = config['job_name']

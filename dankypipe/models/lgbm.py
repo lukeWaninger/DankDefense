@@ -6,7 +6,7 @@ class Model:
         self.parameters = parameters
         self.model = None
 
-        if 'kwargs' not in self.parameters:
+        if 'kwargs' not in self.parameters.keys():
             self.parameters['kwargs'] = {}
 
     def train(self, x, y):

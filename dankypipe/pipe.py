@@ -117,18 +117,11 @@ def set_acl(key):
     Returns:
         None
     """
-    # acl = client.get_bucket_acl(Bucket=const.BUCKET)
-    # del acl['ResponseMetadata']
-    #
-    # client.put_object_acl(
-    #     Bucket=const.BUCKET,
-    #     Key=key,
-    #     AccessControlPolicy=acl
-    # )
-    # res = boto3.resource('s3')
-    # acl = res.ObjectAcl(const.BUCKET, key)
+    res = boto3.resource('s3')
+    obj = res.ObjectAcl(const.PROJECT_NAME, key)
+    result = obj.put(ACL='private', AccessControlPolicy=const.SECRETS['AWS_ACL'])
 
-    return None
+    return result
 
 
 def download_feature(feature_name, cache=False, **kwargs):

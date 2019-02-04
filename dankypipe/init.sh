@@ -32,7 +32,7 @@ pip3 install -r requirements.txt
 
 log_message $"executing runner"
 wget https://raw.githubusercontent.com/lukeWaninger/DankDefense/master/dankypipe/runner.py
-python3 runner.py $JOB &>> $LOGFILE
+python3 runner.py $JOB
 
 log_message $"uploading logs"
 aws s3 cp $LOGFILE s3://dank-defense/jobs/$LOGFILE

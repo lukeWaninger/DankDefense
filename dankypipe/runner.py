@@ -8,6 +8,7 @@ import pandas as pd
 import importlib
 import json
 import itertools
+import os
 import sys
 import copy
 from sklearn.metrics import roc_auc_score, accuracy_score, confusion_matrix, classification_report
@@ -38,10 +39,16 @@ def metrics(y, yhat):
 
 
 def validate(config, parameters):
-    train = config['train']
-    val = config['validate']
+    train = {'x':None, 'y':None} # config['train']
+    val = {'x':None, 'y':None} # config['validate']
 
-    model = load_model(config)(parameters)
+    if 'kwargs' in parameters.keys():
+        kwargs = parameters['kwargs']
+        del parameters['kwargs']
+    else:
+        kwargs = {}
+
+    model = load_model(config)(parameters, **kwargs)
     model.train(**train)
     yhat = model.predict(val['x'])
 
@@ -235,7 +242,7 @@ def load_model(config):
         print(title('Model Source'))
         for line in f:
             if len(line) == 1:
-                print(line)
+                print()
             else:
                 print(line.rstrip())
 
@@ -244,26 +251,31 @@ def load_model(config):
     return model.Model
 
 
-def log(message):
-    sys.stdout.write(f'{c.now()}:  {message}\n')
+def log(job, message):
+    with open(f'{job}_log.txt', 'w') as f:
+        f.write(f'{c.now()}:  {message}\n')
 
 
 def main():
     parser = argparse.ArgumentParser(description='--')
     parser.add_argument('job', type=str, help='HELP!')
+    job = parser.parse_args().job
 
-    job_name = parser.parse_args().job
+    try:
+        log(job, 'building dataset')
 
-    log('building dataset')
+        a = time.time()
+        config = fetch_data(job)
 
-    a = time.time()
-    config = fetch_data(job_name)
+        a, n = np.round(time.time()-a, 2), len(config["features"])
+        log(job, f'downloaded {n} in {a} seconds ({np.round(a/n, 2)} feat/s)')
 
-    a, n = np.round(time.time()-a, 2), len(config["features"])
-    log(f'downloaded {n} in {a} seconds ({np.round(a/n, 2)} feat/s)')
-
-    log('building model')
-    run_task(config)
+        log(job, 'building model')
+        run_task(config)
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        log(job, f'error: {e}\ntype: {exc_type}\nfile: {fname}\nline number: {exc_tb.tb_lineno}')
 
 
 if __name__ == '__main__':

@@ -160,7 +160,6 @@ def tune_grid(config):
     """
     parameters = config['model']['parameters']
     updates = config['tuning']['parameters']
-    job = config['job_name']
     metric = config['tuning']['metric']
 
     candidate_updates = itertools.product(*[
@@ -175,7 +174,7 @@ def tune_grid(config):
     tasks = list(candidate_updates)
     task_count = len(tasks)
     for i, c in enumerate(tasks):
-        log(job, f'fitting task {i+1} of {task_count}')
+        log(f'fitting task {i+1} of {task_count}')
 
         candidate_parameters = copy.deepcopy(parameters)
         candidate_parameters['metric'] = metric
@@ -186,13 +185,13 @@ def tune_grid(config):
         candidate_parameters = dict(params=candidate_parameters)
         res = validate(config, candidate_parameters)
 
-        log(job, json.dumps(res))
+        log(json.dumps(res))
         results.append((candidate_parameters, res))
 
     best_parameters = max(results, key=lambda x: x[1][metric])[0]
 
-    log(job, 'tuning completed')
-    log(job, json.dumps(best_parameters))
+    log('tuning completed')
+    log(json.dumps(best_parameters))
     return best_parameters, results
 
 
@@ -240,9 +239,8 @@ def load_model(config):
     return model.Model
 
 
-def log(job, message):
-    with open(f'{job}_log.txt', 'w') as f:
-        f.write(f'{c.now()}:  {message}\n')
+def log(message):
+    sys.stdout.write(f'{c.now()}:  {message}\n')
 
 
 def main():
@@ -251,15 +249,15 @@ def main():
 
     job_name = parser.parse_args().job
 
-    log(job_name, 'building dataset')
+    log('building dataset')
 
     a = time.time()
     config = fetch_data(job_name)
 
     a, n = np.round(time.time()-a, 2), len(config["features"])
-    log(job_name, f'downloaded {n} in {a} seconds ({np.round(a/n, 2)} feat/s)')
+    log(f'downloaded {n} in {a} seconds ({np.round(a/n, 2)} feat/s)')
 
-    log(job_name, 'building model')
+    log('building model')
     run_task(config)
 
 

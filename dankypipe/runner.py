@@ -23,7 +23,7 @@ def fetch_data(job_name, **kwargs):
     config = pipe.download_config(job_name, **kwargs)
     print('Downloading features...')
     config.update(pipe.build_feature_set(config['features'], **kwargs))
-    config['train_all'] = {
+    config['train_full'] = {
         'x': pd.concat([config['train']['x'], config['validate']['x']], axis=0, sort=False),
         'y': pd.concat([config['train']['y'], config['validate']['y']], axis=0, sort=False)
     }
@@ -100,7 +100,7 @@ def run_task(config):
         else:
             raise KeyError('Search type not defined')
 
-        predictions = predict(config, best_params) if task == 'tune' else None
+        predictions = predict(config, best_params) if task == 'tune_predict' else None
         pipe.upload_results(job, str(results) + str(best_params), predictions)
 
 
@@ -170,11 +170,7 @@ def tune_grid(config):
     job = config['job_name']
 
     candidate_updates = itertools.product(*[
-        [
-            {
-                updates[i]['name']: j
-            } for j in updates[i]['values']
-        ] for i, k in enumerate(updates)
+        [{i: j} for j in k] for i, k in updates.items()
     ])
     results = []
 
@@ -188,12 +184,8 @@ def tune_grid(config):
         for d in c:
             for k, v in d.items():
                 _update_dict(candidate_parameters, k, v)
-                # candidate_parameters[k] = v
 
-        candidate_parameters = dict(params=candidate_parameters)
         res = validate(config, candidate_parameters)
-
-        log(job, res)
         results.append((candidate_parameters, res))
 
     best_parameters = max(results, key=lambda x: x[1][metric])[0]

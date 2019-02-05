@@ -767,7 +767,7 @@ def upload_results(job_name, result_summary, predictions, **kwargs):
         filename = f'{job_name}_predictions.csv'
         key = f'{configure_prefix(const.JOBS_KEY, kwargs)}/{filename}'
 
-        predictions.to_csv(filename, index=None)
+        pd.Series(predictions).to_csv(filename, index=None)
         with open(filename, 'rb') as f:
             response = client.put_object(
                 ACL='private',

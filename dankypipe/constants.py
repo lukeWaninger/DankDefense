@@ -64,15 +64,7 @@ config:
                         - grid
                         - stage_wise
                 parameters:
-                    type: array
-                    items:
-                        type: object
-                        properties:
-                            name:
-                                type: string
-                            values:
-                                type: array
-                                uniqueItems: true
+                    type: object
                 metric:
                     type: string
                     default: auc
@@ -91,7 +83,6 @@ try:
                 list(map(lambda x: x.strip(), l.split('=')))
                 for l in cf if not l.startswith('#')
         ]}
-        print(SECRETS)
 
         for secret in SECRETS:
             os.environ[secret] = SECRETS[secret]

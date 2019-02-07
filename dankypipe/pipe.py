@@ -213,7 +213,7 @@ def build_feature_set(feature_names, max_concurrent_conn=-1, **kwargs):
         for key in const.DATASET_KEYS
     }
 
-    for k, v in result.keys():
+    for k, v in result.items():
         v['x'].drop(columns='MachineIdentifier', inplace=True)
 
     return result

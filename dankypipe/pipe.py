@@ -205,13 +205,18 @@ def build_feature_set(feature_names, max_concurrent_conn=-1, **kwargs):
 
     target = download_feature('Target')
 
-    return {
+    result = {
         key: {
             'x': recursive_join([ri[key] for ri in result]),
             'y': target[key] if key != 'test' else None
         }
         for key in const.DATASET_KEYS
     }
+
+    for k, v in result.items():
+        v['x'].drop(columns='MachineIdentifier', inplace=True)
+
+    return result
 
 
 def download_config(job_name, **kwargs):

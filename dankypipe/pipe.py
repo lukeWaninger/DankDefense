@@ -100,7 +100,7 @@ def upload_feature(feature_name, datasets, overwrite=False, **kwargs):
                 Key=key,
                 Tagging=const.TAG_KEY + "=" + const.PROJECT_NAME
             )
-        set_acl(client, key)
+        set_acl(key)
 
         etags[dataset] = response['ETag'].replace('"', '')
 

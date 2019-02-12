@@ -43,6 +43,8 @@ config:
                         - lightgbm
                 parameters:
                     type: object
+                kwargs:
+                    type: object
         task:
             type: string
             enum: 

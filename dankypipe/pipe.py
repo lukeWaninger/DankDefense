@@ -214,7 +214,10 @@ def build_feature_set(feature_names, max_concurrent_conn=-1, **kwargs):
     }
 
     for k, v in result.items():
-        v['x'].drop(columns='MachineIdentifier', inplace=True)
+        v['x'].drop(columns='MachineIdentifier', inplace=True, errors='ignore')
+
+        if v['y'] is not None:
+            v['y'].drop(columns='MachineIdentifier', inplace=True, errors='ignore')
 
     return result
 

@@ -39,7 +39,7 @@ def get_feature_names(**kwargs):
         prefix = configure_prefix(const.FEATURES_KEY, kwargs)
 
         features = list({
-            re.sub(r'(/|.pickle|_' + '|_'.join(const.DATASET_KEYS) + '|' + prefix + ')+', '', c['Key'])
+            re.sub(r'(/|.csv|_' + '|_'.join(const.DATASET_KEYS) + '|' + prefix + ')+', '', c['Key'])
             for c in contents[1:]
     })
     else:
@@ -82,7 +82,7 @@ def upload_feature(feature_name, datasets, overwrite=False, **kwargs):
     etags = {}
 
     for feat, dataset in zip(datasets, const.DATASET_KEYS):
-        path = f'{feature_name}_{dataset}.pickle'
+        path = f'{feature_name}_{dataset}.csv'
         key = f'{configure_prefix(const.FEATURES_KEY, kwargs)}/{path}'
 
         if isinstance(feat, pd.DataFrame):
@@ -90,7 +90,7 @@ def upload_feature(feature_name, datasets, overwrite=False, **kwargs):
                 os.mkdir('tmp')
 
             path = os.path.join('tmp', path)
-            feat.to_pickle(path, compression='gzip')
+            feat.to_csv(path, compression='gzip')
 
         with open(path, 'rb') as f:
             response = client.put_object(
@@ -147,9 +147,9 @@ def download_feature(feature_name, cache=False, **kwargs):
         if cache and not os.path.exists(prefix):
             os.mkdir(prefix)
 
-        key = f'{prefix}/{feature_name}_{dataset}.pickle'
+        key = f'{prefix}/{feature_name}_{dataset}.csv'
         if os.path.exists(key):
-            result[dataset] = pd.read_pickle(key)
+            result[dataset] = pd.read_csv(key)
 
         else:
             obj = client.get_object(
@@ -160,10 +160,10 @@ def download_feature(feature_name, cache=False, **kwargs):
                 bio = BytesIO(obj['Body'].read())
                 bio.seek(0)
 
-                result[dataset] = pd.read_pickle(bio, compression='gzip')
+                result[dataset] = pd.read_csv(bio, compression='gzip')
 
                 if cache:
-                    result[dataset].to_pickle(key)
+                    result[dataset].to_csv(key, index=None)
                 else:
                     pass
 

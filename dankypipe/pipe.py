@@ -148,7 +148,9 @@ def download_feature(feature_name, cache=False, **kwargs):
 
         key = f'{prefix}/{feature_name}_{dataset}.csv'
         if os.path.exists(key):
-            result[dataset] = pd.read_csv(key)
+            with open(key, 'rb') as f:
+                gz = gzip.GzipFile(fileobj=f)
+                result[dataset] = pd.read_csv(gz)
 
         else:
             obj = client.get_object(
@@ -160,7 +162,7 @@ def download_feature(feature_name, cache=False, **kwargs):
                 bio.seek(0)
 
                 gz = gzip.GzipFile(fileobj=bio)
-                result = pd.read_csv(gz)
+                result[dataset] = pd.read_csv(gz)
 
                 if cache:
                     result[dataset].to_csv(key, index=None)

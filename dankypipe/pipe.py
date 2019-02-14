@@ -159,9 +159,8 @@ def download_feature(feature_name, cache=False, **kwargs):
                 bio = BytesIO(obj['Body'].read())
                 bio.seek(0)
 
-                with open(obj['Body'], 'rb') as fd:
-                    gzip_fd = gzip.GzipFile(fileobj=fd)
-                    result[dataset] = pd.read_csv(gzip_fd)
+                gz = gzip.GzipFile(fileobj=bio)
+                result = pd.read_csv(gz)
 
                 if cache:
                     result[dataset].to_csv(key, index=None)

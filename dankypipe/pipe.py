@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 import datetime as dt
+import gzip
 from io import BytesIO, StringIO
 import json
 import multiprocessing as mul
@@ -158,7 +159,9 @@ def download_feature(feature_name, cache=False, **kwargs):
                 bio = BytesIO(obj['Body'].read())
                 bio.seek(0)
 
-                result[dataset] = pd.read_csv(bio)
+                with open(obj['Body'], 'rb') as fd:
+                    gzip_fd = gzip.GzipFile(fileobj=fd)
+                    result[dataset] = pd.read_csv(gzip_fd)
 
                 if cache:
                     result[dataset].to_csv(key, index=None)

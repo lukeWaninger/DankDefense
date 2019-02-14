@@ -18,14 +18,15 @@ import paramiko
 import dankypipe.constants as const
 
 
+client = boto3.client('s3')
+
+
 def get_feature_names(**kwargs):
     """get the list of feature names
 
     Returns:
         [str,]
     """
-    client = boto3.client('s3')
-
     # TODO: Paginate. will fail over 300 features
     response = client.list_objects_v2(
         Bucket=const.BUCKET,
@@ -78,7 +79,6 @@ def upload_feature(feature_name, datasets, overwrite=False, **kwargs):
     if any([not os.path.exists(p) for p in datasets if isinstance(p, str)]):
         raise FileNotFoundError('Path to feature not found')
 
-    client = boto3.client('s3')
     etags = {}
 
     for feat, dataset in zip(datasets, const.DATASET_KEYS):
@@ -137,8 +137,6 @@ def download_feature(feature_name, cache=False, **kwargs):
     """
     if validate_feature_name(feature_name, **kwargs):
         raise ValueError(f'Feature <{feature_name}> does not exist')
-
-    client = boto3.client('s3')
 
     result = {}
     for dataset in const.DATASET_KEYS:
@@ -234,8 +232,6 @@ def download_config(job_name, **kwargs):
     if job_name not in get_jobs_listing(**kwargs):
         raise ValueError(f'Job <{job_name}> has not been prepared')
 
-    client = boto3.client('s3')
-
     key = f'{configure_prefix(const.JOBS_KEY, kwargs)}/{job_name}_config'
     obj = client.get_object(
         Bucket=const.BUCKET,
@@ -260,8 +256,6 @@ def get_jobs_listing(**kwargs):
     Returns:
         [str,]
     """
-    client = boto3.client('s3')
-
     # TODO: Paginate. will fail over 300
     response = client.list_objects_v2(
         Bucket=const.BUCKET,
@@ -414,8 +408,6 @@ class Ec2Job(object):
         config = json.dumps(self.config)
         jsonschema.validate(config, const.SCHEMA)
         prefix = configure_prefix(const.JOBS_KEY, kwargs)
-
-        client = boto3.client('s3')
 
         key = f'{prefix}/{job_name}_config'
         print(const.TAG_KEY + "=" + const.PROJECT_NAME)
@@ -619,7 +611,6 @@ def get_results(job_name, include_predictions=False, **kwargs):
         raise ValueError(f'Job <{job_name}> has not reported results')
 
     results = {}
-    client = boto3.client('s3')
 
     # get the config
     results['config'] = download_config(job_name, **kwargs)
@@ -751,8 +742,6 @@ def upload_results(job_name, result_summary, predictions, **kwargs):
     """
     if job_name not in get_jobs_listing(**kwargs):
         raise ValueError(f'Job <{job_name}> has not been prepared')
-
-    client = boto3.client('s3')
 
     # upload the result summary
     if result_summary is not None:

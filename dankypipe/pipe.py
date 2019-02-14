@@ -90,7 +90,7 @@ def upload_feature(feature_name, datasets, overwrite=False, **kwargs):
                 os.mkdir('tmp')
 
             path = os.path.join('tmp', path)
-            feat.to_csv(path, compression='gzip')
+            feat.to_csv(path, compression='gzip', index=None)
 
         with open(path, 'rb') as f:
             response = client.put_object(

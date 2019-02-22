@@ -13,6 +13,17 @@ DETECTIONS = '#FFAE09'
 dp = lambda x: os.path.join('/', 'mnt', 'f', 'DankDefense', x)
 
 
+def write_feat(name, train, test):
+    train.to_csv(dp(f'{name}_train.csv'), index=None)
+    test.to_csv(dp(f'{name}_test.csv'), index=None)
+
+
+def get_feat(name, t):
+    train = pd.read_csv(dp(f'{name}_train.csv'), dtype=t)
+    test = pd.read_csv(dp(f'{name}_test.csv'), dtype=t)
+    return train, test
+
+
 def clear(name):
     if not isinstance(name, list):
         name = [name]
@@ -83,7 +94,7 @@ def cateval(df, c):
     return t
 
 
-class DTypes(object):
+class DFMan(object):
     def __init__(self, dtypes):
         self.dtypes = dtypes
 
@@ -105,6 +116,9 @@ class DTypes(object):
 
     def add_type(self, k, v):
         self.dtypes[k] = v
+
+    def remove_type(self, k):
+        del self.dtypes[k]
 
 
 def cat_over_time(df, c, close=False):
@@ -251,5 +265,38 @@ def numeric_over_time(df, c, close=False):
 
         if close:
             x = plt.close()
+    except:
+        print(f'failed {c}')
+
+
+def numeric_by_detections(df, c, close=False):
+    try:
+        x = plt.gcf()
+        fig, ax1 = plt.subplots()
+        x = fig.set_size_inches(13, 6)
+        x = plt.grid(False)
+
+        x = sns.distplot(
+            df.loc[df.HasDetections == 0, c].sample(20_000),
+            hist=False,
+            kde=True,
+            kde_kws={"shade": True},
+            color=NO_DETECTIONS
+        )
+        x = sns.distplot(
+            df.loc[df.HasDetections == 1, c].sample(20_000),
+            hist=False,
+            kde=True,
+            kde_kws={"shade": True},
+            color=DETECTIONS
+        )
+
+        x = plt.savefig(os.path.join('figs', f'{c}_HasDetections.png'))
+
+        if close:
+            x = plt.close()
+
+        del fig
+        x = gc.collect()
     except:
         print(f'failed {c}')

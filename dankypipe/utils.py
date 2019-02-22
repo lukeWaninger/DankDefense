@@ -91,7 +91,7 @@ def pcols(df):
 
 
 def cateval(df, c, test_data=False):
-    print('percent na: ', df[c].isnull().mean())
+    print(f'{"test" if test_data else "train"} percent na: ', df[c].isnull().mean())
 
     if not test_data:
         t = pd.crosstab(df[c], df.HasDetections, normalize='index').sort_values(c)

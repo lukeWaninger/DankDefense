@@ -90,11 +90,13 @@ def pcols(df):
     t = [print(c) for c in sorted(list(set(df.columns)))]
 
 
-def cateval(df, c):
+def cateval(df, c, test_data=False):
     print('percent na: ', df[c].isnull().mean())
-    t = pd.crosstab(df[c], df.HasDetections, normalize='index').sort_values(c)
-    t['total_count'] = df[c].value_counts()
-    t['normalized'] = t.total_count / t.total_count.sum()
+
+    if not test_data:
+        t = pd.crosstab(df[c], df.HasDetections, normalize='index').sort_values(c)
+        t['total_count'] = df[c].value_counts()
+        t['normalized'] = t.total_count / t.total_count.sum()
     return t
 
 

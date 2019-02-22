@@ -14,13 +14,17 @@ dp = lambda x: os.path.join('/', 'mnt', 'f', 'DankDefense', x)
 
 
 def write_feat(name, train, test):
-    train.to_csv(dp(f'{name}_train.csv'), index=None)
-    test.to_csv(dp(f'{name}_test.csv'), index=None)
+    path = dp(os.path.join('feats', name))
+
+    train.to_csv(dp(f'{path}_train.csv'), index=None)
+    test.to_csv(dp(f'{path}_test.csv'), index=None)
 
 
 def get_feat(name, t):
-    train = pd.read_csv(dp(f'{name}_train.csv'), dtype=t)
-    test = pd.read_csv(dp(f'{name}_test.csv'), dtype=t)
+    path = dp(os.path.join('feats', name))
+
+    train = pd.read_csv(dp(f'{path}_train.csv'), dtype=t)
+    test = pd.read_csv(dp(f'{path}_test.csv'), dtype=t)
     return train, test
 
 
@@ -121,21 +125,17 @@ class DFMan(object):
         del self.dtypes[k]
 
 
-def cat_over_time(df, c, close=False):
-    t = str(type(df['AppVersion'].dtype)).split('.')[-1].replace('\'>', '')
-    if t != t != 'CategoricalDtype' or c in ['HasDetections', 'AvSigVersion', 'MachineIdentifier']:
-        return
-
+def cat_over_time(train, test, c, close=False):
     try:
-        if len(df[c].unique()) > 15:
+        if len(train[c].unique()) > 15:
             return
 
         def fx(df_):
             ct = df_[c].value_counts(normalize=True)
             return ct
 
-        df_train = df[['avsig_dt', 'MachineIdentifier', c]].groupby(['avsig_dt']).apply(fx).reset_index()
-        df_test = df[['avsig_dt', 'MachineIdentifier', c]].groupby(['avsig_dt']).apply(fx).reset_index()
+        df_train = train[['avsig_dt', 'MachineIdentifier', c]].groupby(['avsig_dt']).apply(fx).reset_index()
+        df_test = test[['avsig_dt', 'MachineIdentifier', c]].groupby(['avsig_dt']).apply(fx).reset_index()
 
         df = pd.concat([df_train, df_test], axis=0, sort=False).sort_values(by='avsig_dt')
         df.columns = ['date', c, 'perc']
@@ -208,18 +208,18 @@ def cat_by_detections(df, c, close=False):
         print(f'failed {c}')
 
 
-def numeric_over_time(df, c, close=False):
+def numeric_over_time(train, test, c, close=False):
     try:
         train_name = f'mean_{c}_train'
         test_name = f'mean_{c}_test'
 
-        df_train = df[[c, 'avsig_dt', 'HasDetections']]\
+        df_train = train[[c, 'avsig_dt', 'HasDetections']]\
             .groupby(['avsig_dt'])\
             .agg([np.mean])\
             .reset_index()
         df_train.columns = ['dt', train_name, 'mean_detections']
 
-        df_test = df[[c, 'avsig_dt']]\
+        df_test = test[[c, 'avsig_dt']]\
             .groupby(['avsig_dt'])\
             .agg([np.mean])\
             .reset_index()

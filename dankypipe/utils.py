@@ -206,7 +206,8 @@ def cat_by_detections(df, c, close=False):
 
         del df_, fig
         x = gc.collect()
-    except:
+    except Exception as e:
+        print(e)
         print(f'failed {c}')
 
 
@@ -267,7 +268,8 @@ def numeric_over_time(train, test, c, close=False):
 
         if close:
             x = plt.close()
-    except:
+    except Exception as e:
+        print(e)
         print(f'failed {c}')
 
 
@@ -300,5 +302,6 @@ def numeric_by_detections(df, c, close=False):
 
         del fig
         x = gc.collect()
-    except:
+    except Exception as e:
+        print(e)
         print(f'failed {c}')

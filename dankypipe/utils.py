@@ -97,7 +97,7 @@ def cateval(df, c, test_data=False):
         t = pd.crosstab(df[c], df.HasDetections, normalize='index').sort_values(c)
         t['total_count'] = df[c].value_counts()
         t['normalized'] = t.total_count / t.total_count.sum()
-    return t
+        return t
 
 
 class DFMan(object):

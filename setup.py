@@ -24,7 +24,7 @@ setuptools.setup(
         'lightgbm==2.2.2',
         'numpy==1.16.0',
         'pandas==0.24.0',
-        'paramiko==2.4.2',
+        'paramiko==2.10.1',
         'requests>=2.20.0',
         'scikit-learn==0.20.2',
         'scipy==1.2.0',

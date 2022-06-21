@@ -22,7 +22,7 @@ setuptools.setup(
         'boto3==1.9.84',
         'jsonschema==2.6.0',
         'lightgbm==2.2.2',
-        'numpy==1.16.0',
+        'numpy==1.22.0',
         'pandas==0.24.0',
         'paramiko==2.4.2',
         'requests>=2.20.0',
